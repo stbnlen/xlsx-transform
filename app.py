@@ -33,7 +33,7 @@ if uploaded_file is not None:
         # Rename columns to match the requested output names
         # Create a new dataframe with renamed columns to avoid potential issues
         filtered_df = filtered_df.rename(
-            columns={'n_operacion_principal': 'n_operacion', 'saldo_capital': 'SALDO CAPITAL'}
+            columns={'saldo_capital': 'SALDO CAPITAL'}
         )
         
         st.subheader("Filtered Data Preview:")
