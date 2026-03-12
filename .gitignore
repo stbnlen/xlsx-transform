@@ -133,9 +133,9 @@ Thumbs.db
 # Logs
 *.log
 
-# Excel files (optional - uncomment if you don't want to commit Excel files)
-# *.xlsx
-# *.xls
+# Excel files
+*.xlsx
+*.xls
 
 # Temporary files
 *.tmp
