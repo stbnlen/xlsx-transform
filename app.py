@@ -57,7 +57,7 @@ def show_q_banco_view():
             st.download_button(
                 label="Download Filtered Excel",
                 data=output.getvalue(),
-                file_name="filtered_output.xlsx",
+                file_name=f"{st.session_state.current_view}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
@@ -109,7 +109,7 @@ def show_q_cmr_view():
             st.download_button(
                 label="Download Filtered Excel",
                 data=output.getvalue(),
-                file_name="filtered_output.xlsx",
+                file_name=f"{st.session_state.current_view}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
