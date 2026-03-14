@@ -1,17 +1,22 @@
 import streamlit as st
 import pandas as pd
 import io
+import re
 
-st.title("Excel Transformer - Column Filter")
+def normalize_column_name(col_name):
+    """Normalize column name for comparison: lowercase and remove underscores"""
+    if not isinstance(col_name, str):
+        col_name = str(col_name)
+    return re.sub(r'_+', '', col_name.lower())
 
-# Initialize session state for view if not present
-if 'current_view' not in st.session_state:
-    st.session_state.current_view = 'Q_BANCO'
+def find_matching_column(df_columns, target_col):
+    """Find actual column name that matches target column (case-insensitive, underscore-insensitive)"""
+    normalized_target = normalize_column_name(target_col)
+    for col in df_columns:
+        if normalize_column_name(col) == normalized_target:
+            return col
+    return None
 
-# Show active view title
-st.markdown(f"**Vista activa:** {st.session_state.current_view}")
-
-# Function to handle Q_BANCO view logic
 def show_q_banco_view():
     uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"])
     
@@ -29,21 +34,31 @@ def show_q_banco_view():
                           'ESTADO CRM', 'ESTADO JUDICIAL', 'saldo_capital', 
                           '% DESCUENTO', 'comuna_particular']
         
-        # Check if all required columns exist
-        missing_columns = [col for col in columns_to_keep if col not in df.columns]
+        # Check if all required columns exist (case-insensitive, underscore-insensitive)
+        missing_columns = []
+        column_mapping = {}  # Maps expected column name to actual column name in file
+        
+        for expected_col in columns_to_keep:
+            actual_col = find_matching_column(df.columns, expected_col)
+            if actual_col is None:
+                missing_columns.append(expected_col)
+            else:
+                column_mapping[expected_col] = actual_col
         
         if missing_columns:
             st.error(f"Missing columns in the uploaded file: {missing_columns}")
             st.write("Available columns:", list(df.columns))
+            st.write("Normalized available columns:", [normalize_column_name(col) for col in df.columns])
         else:
-            # Filter the dataframe
-            filtered_df = df[columns_to_keep].copy()
+            # Filter the dataframe using actual column names
+            actual_columns_to_use = [column_mapping[col] for col in columns_to_keep]
+            filtered_df = df[actual_columns_to_use].copy()
             
             # Rename columns to match the requested output names
             filtered_df = filtered_df.rename(columns={
                 'n_operacion_principal': 'n_operacion',
                 'saldo_capital': 'SALDO CAPITAL'
-            })  # type: ignore
+            })
             
             st.subheader("Filtered Data Preview:")
             st.dataframe(filtered_df)
@@ -60,6 +75,7 @@ def show_q_banco_view():
                 file_name=f"{st.session_state.current_view}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
 
 # Function to handle Q_CMR view logic
 def show_q_cmr_view():
@@ -79,23 +95,29 @@ def show_q_cmr_view():
                           'ESTADO JUDICIAL', 'DESCUENTO CAMPAÑA', 'SALDO_DEUDA', 'TRAMO', 
                           'estado_cuenta']
         
-        # Check if all required columns exist
-        missing_columns = [col for col in columns_to_keep if col not in df.columns]
+        # Check if all required columns exist (case-insensitive, underscore-insensitive)
+        missing_columns = []
+        column_mapping = {}  # Maps expected column name to actual column name in file
+        
+        for expected_col in columns_to_keep:
+            actual_col = find_matching_column(df.columns, expected_col)
+            if actual_col is None:
+                missing_columns.append(expected_col)
+            else:
+                column_mapping[expected_col] = actual_col
         
         if missing_columns:
             st.error(f"Missing columns in the uploaded file: {missing_columns}")
             st.write("Available columns:", list(df.columns))
+            st.write("Normalized available columns:", [normalize_column_name(col) for col in df.columns])
         else:
-            # Filter the dataframe
-            filtered_df = df[columns_to_keep].copy()
+            # Filter the dataframe using actual column names
+            actual_columns_to_use = [column_mapping[col] for col in columns_to_keep]
+            filtered_df = df[actual_columns_to_use].copy()
             
-            # Rename columns if needed (for Q_CMR, we're keeping the original names based on user request)
-            # The user requested: rut, n_operacion_principal, dv, nombre_completo, CARTERA, CATEGORIA, SUCURSAL, 
-            # EJECUTIVA ASIGNADA, ESTADO JUDICIAL, DESCUENTO CAMPAÑA, SALDO_DEUDA, TRAMO, estado_cuenta
-            # But the file has 'nombre_completo_cliente', not 'nombre_completo'
-            # Since the user said "nombre_completo" but the file has 'nombre_completo_cliente', 
-            # I'll keep the original name from the file to avoid errors
-            # If the user really wants it renamed, they should clarify
+            # Rename columns to match the expected names (for consistency)
+            rename_dict: dict[str, str] = {actual: expected for expected, actual in column_mapping.items()}
+            filtered_df = filtered_df.rename(columns=rename_dict)
             
             st.subheader("Filtered Data Preview:")
             st.dataframe(filtered_df)
@@ -112,34 +134,3 @@ def show_q_cmr_view():
                 file_name=f"{st.session_state.current_view}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-# Buttons to switch view with explicit rerun to ensure proper state handling
-col1, col2 = st.columns(2)
-with col1:
-    # Always show Q_BANCO button, but handle logic in callback
-    if st.button('Q_BANCO'):
-        # Only change view if not already in Q_BANCO mode
-        if st.session_state.current_view != 'Q_BANCO':
-            st.session_state.current_view = 'Q_BANCO'
-            st.rerun()
-with col2:
-    # Always show Q_CMR button, but handle logic in callback
-    if st.button('Q_CMR'):
-        # Only change view if not already in Q_CMR mode
-        if st.session_state.current_view != 'Q_CMR':
-            st.session_state.current_view = 'Q_CMR'
-            st.rerun()
-
-# Add visual indicator of active view by styling the buttons
-# We'll use markdown to show which view is active with a visual cue
-st.markdown("---")
-if st.session_state.current_view == 'Q_BANCO':
-    st.markdown("🔹 **Modo Q_BANCO activo** - Mostrando lógica completa de filtrado")
-else:
-    st.markdown("🔹 **Modo Q_CMR activo** - Mostrando lógica completa de filtrado")
-
-# Conditionally show the view
-if st.session_state.current_view == 'Q_BANCO':
-    show_q_banco_view()
-else:
-    show_q_cmr_view()
