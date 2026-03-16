@@ -1,24 +1,10 @@
 import streamlit as st
 import pandas as pd
 import io
-import re
-
-def normalize_column_name(col_name):
-    """Normalize column name for comparison: lowercase and remove underscores"""
-    if not isinstance(col_name, str):
-        col_name = str(col_name)
-    return re.sub(r'_+', '', col_name.lower())
-
-def find_matching_column(df_columns, target_col):
-    """Find actual column name that matches target column (case-insensitive, underscore-insensitive)"""
-    normalized_target = normalize_column_name(target_col)
-    for col in df_columns:
-        if normalize_column_name(col) == normalized_target:
-            return col
-    return None
+from utils import normalize_column_name, find_matching_column, validate_required_columns
 
 def show_q_banco_view():
-    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"])
+    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"], key="q_banco_uploader")
     
     if uploaded_file is not None:
         # Read the uploaded file
@@ -30,20 +16,12 @@ def show_q_banco_view():
         
         # Define the columns to keep for Q_BANCO
         columns_to_keep = ['rut', 'dv', 'n_operacion_principal', 'origen_core', 
-                          'nombre_completo_cliente', 'SUCURSAL', 'CARTERA', 
-                          'ESTADO CRM', 'ESTADO JUDICIAL', 'saldo_capital', 
-                          '% DESCUENTO', 'comuna_particular']
-        
+                           'nombre_completo_cliente', 'SUCURSAL', 'CARTERA', 
+                           'ESTADO CRM', 'ESTADO JUDICIAL', 'saldo_capital', 
+                           '% DESCUENTO', 'comuna_particular']
+          
         # Check if all required columns exist (case-insensitive, underscore-insensitive)
-        missing_columns = []
-        column_mapping = {}  # Maps expected column name to actual column name in file
-        
-        for expected_col in columns_to_keep:
-            actual_col = find_matching_column(df.columns, expected_col)
-            if actual_col is None:
-                missing_columns.append(expected_col)
-            else:
-                column_mapping[expected_col] = actual_col
+        missing_columns, column_mapping = validate_required_columns(df.columns, columns_to_keep)
         
         if missing_columns:
             st.error(f"Missing columns in the uploaded file: {missing_columns}")
@@ -72,14 +50,14 @@ def show_q_banco_view():
             st.download_button(
                 label="Download Filtered Excel",
                 data=output.getvalue(),
-                file_name=f"{st.session_state.current_view}.xlsx",
+                file_name="q_banco_filtered.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
 
 # Function to handle Q_CMR view logic
 def show_q_cmr_view():
-    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"])
+    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"], key="q_cmr_uploader")
     
     if uploaded_file is not None:
         # Read the uploaded file
@@ -91,20 +69,12 @@ def show_q_cmr_view():
         
         # Define the columns to keep for Q_CMR
         columns_to_keep = ['rut', 'n_operacion_principal', 'dv', 'nombre_completo_cliente', 
-                          'CARTERA', 'CATEGORIA', 'SUCURSAL', 'EJECUTIVA ASIGNADA', 
-                          'ESTADO JUDICIAL', 'DESCUENTO CAMPAÑA', 'SALDO_DEUDA', 'TRAMO', 
-                          'estado_cuenta']
-        
+                           'CARTERA', 'CATEGORIA', 'SUCURSAL', 'EJECUTIVA ASIGNADA', 
+                           'ESTADO JUDICIAL', 'DESCUENTO CAMPAÑA', 'SALDO_DEUDA', 'TRAMO', 
+                           'estado_cuenta']
+          
         # Check if all required columns exist (case-insensitive, underscore-insensitive)
-        missing_columns = []
-        column_mapping = {}  # Maps expected column name to actual column name in file
-        
-        for expected_col in columns_to_keep:
-            actual_col = find_matching_column(df.columns, expected_col)
-            if actual_col is None:
-                missing_columns.append(expected_col)
-            else:
-                column_mapping[expected_col] = actual_col
+        missing_columns, column_mapping = validate_required_columns(df.columns, columns_to_keep)
         
         if missing_columns:
             st.error(f"Missing columns in the uploaded file: {missing_columns}")
@@ -131,6 +101,17 @@ def show_q_cmr_view():
             st.download_button(
                 label="Download Filtered Excel",
                 data=output.getvalue(),
-                file_name=f"{st.session_state.current_view}.xlsx",
+                file_name="q_cmr_filtered.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+# Main app with tabs
+tab1, tab2 = st.tabs(["Q_BANCO", "Q_CMR"])
+
+with tab1:
+    st.header("Q_BANCO View")
+    show_q_banco_view()
+
+with tab2:
+    st.header("Q_CMR View")
+    show_q_cmr_view()
