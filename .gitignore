@@ -140,6 +140,13 @@ Thumbs.db
 *.xlsx
 *.xls
 
+# Virtual environments
+test_env/
+.venv/
+venv/
+ENV/
+env/
+
 # Temporary files
 *.tmp
 *.temp
