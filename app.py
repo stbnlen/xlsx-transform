@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+from typing import Dict
 from utils import normalize_column_name, find_matching_column, validate_required_columns
 
 def show_q_banco_view():

@@ -121,6 +121,9 @@ dmypy.json
 # Uncomment the following line if you want to ignore all Streamlit config files
 # .streamlit/secrets.toml
 
+# Agent skills
+.agents/
+
 # OS-generated files
 .DS_Store
 .DS_Store?
