@@ -1,3 +1,12 @@
 streamlit
 pandas
 openpyxl
+scipy
+statsmodels
+seaborn
+xgboost
+lightgbm
+scikit-learn
+xgboost
+lightgbm
+scikit-learn
