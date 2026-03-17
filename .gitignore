@@ -75,6 +75,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+prediccion_recupero_forum_v2.ipynb
 
 # IPython
 profile_default/
