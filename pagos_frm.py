@@ -103,7 +103,7 @@ def show_pagos_frm_view():
             if 'AÑO' in df_clean.columns and 'MES_NUM' in df_clean.columns and 'MONTO' in df_clean.columns:
                 try:
                     monthly = aggregate_monthly(df_clean, 'MONTO')
-                     
+                       
                     if monthly is not None and len(monthly) > 0:
                         _show_monthly_metrics(monthly)
                         _show_descriptive_stats(monthly)
@@ -112,7 +112,7 @@ def show_pagos_frm_view():
                         _show_trend_analysis(monthly)
                         _show_patterns_analysis(monthly)
                         _show_correlation_analysis(monthly)
-                        _show_pagos_por_ejecutiva(monthly, df_clean)
+                        _show_analisis_mensual_comparativo(monthly, df_clean)
                         _show_prediction_analysis(monthly, df_clean)
                     elif monthly is not None:
                         st.warning("⚠️ No historical data available for detailed analysis")
@@ -338,194 +338,299 @@ def _show_correlation_analysis(monthly: pd.DataFrame):
         st.warning("⚠️ La columna 'monto_total' no está disponible para correlación")
 
 
-def _show_pagos_por_ejecutiva(monthly: pd.DataFrame, df_original: pd.DataFrame):
-    """Display analysis of payments by executive for the current month."""
+
+
+
+
+def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.DataFrame):
+    """Display comparative analysis of current month vs historical data for the same month."""
     st.write("---")
-    st.subheader("👥 Análisis de Pagos por Ejecutiva (Mes Actual)")
+    st.subheader("📊 Análisis Mensual Comparativo")
     st.info("""
-    **Este análisis muestra la distribución de pagos por ejecutiva para el mes actual:**
-    1. **Ranking de ejecutivas**: Posición de cada ejecutiva según el monto total recuperado en el mes actual
-    2. **Participación porcentual**: Contribución de cada ejecutiva al total del mes actual
+    **Este análisis compara el mes actual con el mismo mes en años anteriores:**
+    1. **Valores actuales**: Monto total y número de pagos del mes actual
+    2. **Promedio histórico**: Promedio del mismo mes en años anteriores
+    3. **Variación porcentual**: Cambio porcentual respecto al promedio histórico
+    4. **Tendencia**: Evolución del mismo mes a lo largo de los años
     """)
     
-    # Check if EJECUTIVA column exists
-    if 'EJECUTIVA' not in df_original.columns:
-        st.warning("⚠️ No se encontró la columna 'EJECUTIVA' en los datos")
-        return
-        
     try:
         import matplotlib.pyplot as plt
         import seaborn as sns
+        import numpy as np
         
         # Get current month from monthly data (last row is the current/incomplete month)
         if len(monthly) == 0:
             st.warning("⚠️ No hay datos mensuales disponibles")
             return
             
-        current_month = monthly.iloc[-1]['AÑO_MES']
-        st.write(f"**Analizando datos para el mes: {current_month}**")
+        current_month_data = monthly.iloc[-1]
+        current_period = current_month_data['AÑO_MES']
+        st.write(f"**Analizando datos para el período: {current_period}**")
         
-        # Prepare data for executive analysis - filter to current month only
-        df_exec = df_original.copy()
+        # Extract year and month from the period
+        try:
+            current_year = int(str(current_period)[:4])
+            current_month_num = int(str(current_period)[5:7])
+        except (ValueError, IndexError):
+            # Fallback: try to get from año and mes columns if they exist
+            if 'año' in monthly.columns and 'mes' in monthly.columns:
+                current_year = int(monthly.iloc[-1]['año'])
+                current_month_num = int(monthly.iloc[-1]['mes'])
+            else:
+                st.error("⚠️ No se pudo extraer el año y mes de los datos")
+                return
         
-        # Ensure date column is datetime
-        if 'FECHA_PAGO' in df_exec.columns:
-            df_exec['FECHA_PAGO'] = pd.to_datetime(df_exec['FECHA_PAGO'])
-            df_exec['AÑO_MES'] = df_exec['FECHA_PAGO'].dt.to_period('M')
-        else:
-            st.warning("⚠️ No se encontró la columna de fecha para el análisis por ejecutiva")
+        # Get historical data (excluding current month for comparison)
+        historico = monthly.iloc[:-1].copy()
+        
+        if len(historico) == 0:
+            st.warning("⚠️ No hay datos históricos disponibles para comparación")
+            # Still show current month data
+            _show_current_month_only(current_month_data)
             return
+        
+        # Filter historical data for the same month number
+        mismo_mes_historico = historico[historico['mes'] == current_month_num]
+        
+        if len(mismo_mes_historico) == 0:
+            st.warning(f"⚠️ No hay datos históricos para el mes {current_month_num} para comparar")
+            # Still show current month data
+            _show_current_month_only(current_month_data)
+            return
+        
+        # Calculate metrics
+        current_amount = current_month_data['monto_total']
+        current_payments = current_month_data['num_pagos']
+        
+        historical_avg_amount = mismo_mes_historico['monto_total'].mean()
+        historical_avg_payments = mismo_mes_historico['num_pagos'].mean()
+        
+        # Calculate year-over-year change (if we have previous year data)
+        previous_year_data = mismo_mes_historico[mismo_mes_historico['año'] == current_year - 1]
+        yoy_change_amount = None
+        yoy_change_payments = None
+        
+        if len(previous_year_data) > 0:
+            prev_year_amount = previous_year_data.iloc[0]['monto_total']
+            prev_year_payments = previous_year_data.iloc[0]['num_pagos']
             
-        # Filter to only current month
-        df_exec = df_exec[df_exec['AÑO_MES'] == current_month]
+            if prev_year_amount != 0:
+                yoy_change_amount = ((current_amount - prev_year_amount) / prev_year_amount) * 100
+            if prev_year_payments != 0:
+                yoy_change_payments = ((current_payments - prev_year_payments) / prev_year_payments) * 100
         
-        # Exclude JUDICIAL from analysis as requested
-        df_exec = df_exec[df_exec['EJECUTIVA'] != 'JUDICIAL']
+        # Calculate percentage change from historical average
+        pct_change_amount = ((current_amount - historical_avg_amount) / historical_avg_amount * 100) if historical_avg_amount != 0 else 0
+        pct_change_payments = ((current_payments - historical_avg_payments) / historical_avg_payments * 100) if historical_avg_payments != 0 else 0
         
-        if len(df_exec) == 0:
-            st.warning(f"⚠️ No hay datos para el mes {current_month} después de excluir JUDICIAL")
-            return
+        # Display metrics in columns
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Monto Actual", 
+                f"${current_amount:,.0f}",
+                f"{pct_change_amount:+.1f}% vs promedio histórico"
+            )
             
-        # Ensure MONTO column exists and is numeric
-        if 'MONTO' not in df_exec.columns:
-            st.warning("⚠️ No se encontró la columna 'MONTO' para el análisis por ejecutiva")
-            return
+        with col2:
+            st.metric(
+                "Pagos Actuales", 
+                f"{current_payments:,.0f}",
+                f"{pct_change_payments:+.1f}% vs promedio histórico"
+            )
             
-        df_exec['MONTO'] = pd.to_numeric(df_exec['MONTO'], errors='coerce')
-        
-        # Remove rows with missing data
-        df_exec = df_exec.dropna(subset=['EJECUTIVA', 'MONTO'])
-        
-        if len(df_exec) == 0:
-            st.warning("⚠️ No hay datos válidos para el análisis por ejecutiva después de limpiar")
-            return
-        
-        # Aggregate by executive for current month only
-        exec_totals = df_exec.groupby('EJECUTIVA')['MONTO'].sum().sort_values(ascending=False)
-        
-        if len(exec_totals) == 0:
-            st.warning("⚠️ No hay datos de ejecutivas para mostrar")
-            return
-        
-        # Get top executives (show all if less than 10, otherwise top 10)
-        top_n = min(10, len(exec_totals))
-        top_executives = exec_totals.head(top_n)
+        with col3:
+            if yoy_change_amount is not None:
+                st.metric(
+                    "Cambio Anual Monto", 
+                    f"{yoy_change_amount:+.1f}%",
+                    f"vs {current_year-1}"
+                )
+            else:
+                st.metric(
+                    "Promedio Histórico Monto", 
+                    f"${historical_avg_amount:,.0f}"
+                )
+                
+        with col4:
+            if yoy_change_payments is not None:
+                st.metric(
+                    "Cambio Anual Pagos", 
+                    f"{yoy_change_payments:+.1f}%",
+                    f"vs {current_year-1}"
+                )
+            else:
+                st.metric(
+                    "Promedio Histórico Pagos", 
+                    f"{historical_avg_payments:,.0f}"
+                )
         
         # Create visualization
-        fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         
-        # 1. Total by executive for current month (bar chart)
+        # 1. Bar chart: Current vs Historical Average
         ax1 = axes[0, 0]
-        bars = ax1.bar(range(len(top_executives)), top_executives.values / 1e6, 
-                      color=sns.color_palette("mako", n_colors=len(top_executives)))
-        ax1.set_title(f'Total Recuperado por Ejecutiva - {current_month}', fontweight='bold', fontsize=12)
-        ax1.set_ylabel('Millones $', fontsize=10)
-        ax1.set_xlabel('Ejecutiva', fontsize=10)
-        ax1.set_xticklabels(top_executives.index, rotation=45, ha='right', fontsize=9)
+        categories = ['Monto Total', 'Número de Pagos']
+        current_values = [current_amount, current_payments]
+        historical_values = [historical_avg_amount, historical_avg_payments]
+        
+        x = np.arange(len(categories))
+        width = 0.35
+        
+        bars1 = ax1.bar(x - width/2, current_values, width, label='Actual', color='skyblue', alpha=0.8)
+        bars2 = ax1.bar(x + width/2, historical_values, width, label='Promedio Histórico', color='lightcoral', alpha=0.8)
+        
+        ax1.set_title('Comparación: Actual vs Promedio Histórico', fontweight='bold')
+        ax1.set_ylabel('Valor')
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(categories)
+        ax1.legend()
+        
         # Add value labels on bars
-        for i, v in enumerate(top_executives.values):
-            ax1.text(i, v/1e6, f'${v/1e6:.1f}M', ha='center', va='bottom', fontsize=9)
+        def autolabel(bars):
+            for bar in bars:
+                height = bar.get_height()
+                ax1.annotate(f'{height:,.0f}',
+                            xy=(bar.get_x() + bar.get_width() / 2, height),
+                            xytext=(0, 3),  # 3 points vertical offset
+                            textcoords="offset points",
+                            ha='center', va='bottom', fontsize=9)
         
-        # 2. Participation percentage (pie chart)
+        autolabel(bars1)
+        autolabel(bars2)
+        
+        # 2. Line chart: Historical trend for same month
         ax2 = axes[0, 1]
-        total_amount = exec_totals.sum()
-        if len(exec_totals) <= 8:
-            # Show all executives if 8 or fewer
-            percentages = (exec_totals / total_amount * 100)
+        if len(mismo_mes_historico) > 0:
+            # Sort by year for proper line chart
+            mismo_mes_sorted = mismo_mes_historico.sort_values('año')
+            años = mismo_mes_sorted['año'].tolist()
+            montos = mismo_mes_sorted['monto_total'].tolist()
+            pagos = mismo_mes_sorted['num_pagos'].tolist()
+            
+            ax2_twin = ax2.twinx()
+            
+            line1 = ax2.plot(años, montos, 'b-o', label='Monto Total', linewidth=2, markersize=4)
+            line2 = ax2_twin.plot(años, pagos, 'r-s', label='Número de Pagos', linewidth=2, markersize=4)
+            
+            # Highlight current year if it exists in historical data (shouldn't, but just in case)
+            current_in_historico = mismo_mes_historico[mismo_mes_historico['año'] == current_year]
+            if len(current_in_historico) > 0:
+                ax2.plot(current_year, current_in_historico.iloc[0]['monto_total'], 'b*', markersize=12, label='Actual')
+                ax2_twin.plot(current_year, current_in_historico.iloc[0]['num_pagos'], 'r*', markersize=12, label='Actual')
+            
+            ax2.set_xlabel('Año')
+            ax2.set_ylabel('Monto Total ($)', color='b')
+            ax2_twin.set_ylabel('Número de Pagos', color='r')
+            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num}', fontweight='bold')
+            
+            # Combine legends
+            lines1, labels1 = ax2.get_legend_handles_labels()
+            lines2, labels2 = ax2_twin.get_legend_handles_labels()
+            ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+            
+            ax2.grid(True, alpha=0.3)
         else:
-            # Show top 7 + "Otros" for better visualization
-            top_7 = exec_totals.head(7)
-            others_sum = exec_totals.iloc[7:].sum()
-            percentages = pd.concat([top_7, pd.Series([others_sum], index=['Otros'])]) / total_amount * 100
+            ax2.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar tendencia', 
+                    ha='center', va='center', transform=ax2.transAxes)
+            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num}', fontweight='bold')
         
-        wedges, texts, autotexts = ax2.pie(percentages.values, labels=percentages.index, 
-                                          autopct='%1.1f%%', startangle=90,
-                                          colors=sns.color_palette("mako", n_colors=len(percentages)))
-        ax2.set_title('Participación Porcentual por Ejecutiva', fontweight='bold', fontsize=12)
-        # Make percentage text more readable
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(9)
-        
-        # 3. Executive ranking table
+        # 3. Waterfall chart showing contributions to change from historical average
         ax3 = axes[1, 0]
-        ax3.axis('tight')
-        ax3.axis('off')
+        change_amount = current_amount - historical_avg_amount
+        change_payments = current_payments - historical_avg_payments
         
-        # Create ranking table
-        ranking_data = []
-        for i, (ejecutiva, monto) in enumerate(exec_totals.items(), 1):
-            porcentaje = (monto / total_amount * 100)
-            ranking_data.append([
-                i, 
-                ejecutiva, 
-                f"${monto:,.0f}", 
-                f"{porcentaje:.1f}%"
-            ])
+        # Data for waterfall
+        categories_waterfall = ['Promedio Histórico', 'Cambio Monto', 'Cambio Pagos', 'Valor Actual']
+        values_waterfall = [historical_avg_amount, change_amount, change_payments, current_amount]
         
-        table = ax3.table(cellText=ranking_data,
-                         colLabels=['Rank', 'Ejecutiva', 'Monto', 'Participación'],
-                         cellLoc='center',
-                         loc='center')
-        table.auto_set_font_size(False)
-        table.set_fontsize(9)
-        table.scale(1.2, 1.5)
-        ax3.set_title(f'Ranking de Ejecutivas - {current_month}', fontweight='bold', fontsize=12, pad=20)
+        # Calculate cumulative positions for waterfall
+        cumulative = [0]
+        for i in range(len(values_waterfall)-1):
+            cumulative.append(cumulative[-1] + values_waterfall[i])
         
-        # 4. Daily evolution within the month (if we have daily data)
+        # Colors: positive = green, negative = red
+        colors_waterfall = ['gray']  # Starting point
+        for i in range(1, len(values_waterfall)-1):
+            colors_waterfall.append('green' if values_waterfall[i] >= 0 else 'red')
+        colors_waterfall.append('blue')  # End point
+        
+        bars3 = ax3.bar(range(len(categories_waterfall)), values_waterfall, 
+                       color=colors_waterfall, alpha=0.7, edgecolor='black')
+        
+        # Add connector lines for waterfall effect
+        for i in range(1, len(bars3)-1):
+            ax3.plot([i-1+0.4, i-1+0.6], [cumulative[i], cumulative[i]], 'k--', alpha=0.5)
+            ax3.plot([i-0.4, i-0.4], [cumulative[i], cumulative[i+1]], 'k--', alpha=0.5)
+        
+        ax3.set_title('Desglose de Cambios respecto al Promedio Histórico', fontweight='bold')
+        ax3.set_ylabel('Valor')
+        ax3.set_xticks(range(len(categories_waterfall)))
+        ax3.set_xticklabels(categories_waterfall, rotation=15)
+        
+        # Add value labels on bars
+        for i, (bar, value) in enumerate(zip(bars3, values_waterfall)):
+            height = bar.get_height()
+            ax3.text(bar.get_x() + bar.get_width()/2, 
+                    height + (0.01 * abs(height) if height >= 0 else -0.01 * abs(height)),
+                    f'{value:,.0f}', ha='center', 
+                    va='bottom' if height >= 0 else 'top', fontsize=9)
+        
+        # 4. Box plot showing distribution of historical data for same month
         ax4 = axes[1, 1]
-        if 'FECHA_PAGO' in df_exec.columns:
-            # Group by day and executive for daily evolution
-            df_exec['DIA'] = df_exec['FECHA_PAGO'].dt.day
-            daily_exec = df_exec.groupby(['DIA', 'EJECUTIVA'])['MONTO'].sum().reset_index()
+        if len(mismo_mes_historico) > 0:
+            box_data = [mismo_mes_historico['monto_total'].values, mismo_mes_historico['num_pagos'].values]
+            box_plot = ax4.boxplot(box_data, labels=['Monto Total', 'Número de Pagos'], patch_artist=True)
             
-            # Get top 5 executives for daily chart to avoid overcrowding
-            top_5_execs = exec_totals.head(5).index.tolist()
-            daily_top = daily_exec[daily_exec['EJECUTIVA'].isin(top_5_execs)]
+            # Color the boxes
+            colors = ['lightblue', 'lightgreen']
+            for patch, color in zip(box_plot['boxes'], colors):
+                patch.set_facecolor(color)
             
-            if len(daily_top) > 0:
-                for ejecutiva in top_5_execs:
-                    ejec_data = daily_top[daily_top['EJECUTIVA'] == ejecutiva].sort_values('DIA')
-                    if len(ejec_data) > 0:
-                        ax4.plot(ejec_data['DIA'], ejec_data['MONTO'] / 1e6, 
-                                marker='o', linewidth=2, label=ejecutiva)
-                ax4.set_title(f'Evolución Diaria por Ejecutiva (Top 5) - {current_month}', fontweight='bold', fontsize=12)
-                ax4.set_ylabel('Millones $', fontsize=10)
-                ax4.set_xlabel('Día del Mes', fontsize=10)
-                ax4.legend(loc='upper right', fontsize=9)
-                ax4.grid(True, alpha=0.3)
-                ax4.set_xticks(range(1, int(df_exec['DIA'].max()) + 1))
-            else:
-                ax4.text(0.5, 0.5, 'No hay suficientes datos para la evolución diaria', 
-                        ha='center', va='center', transform=ax4.transAxes)
-                ax4.set_title('Evolución Diaria por Ejecutiva', fontweight='bold', fontsize=12)
+            # Add current value as a point
+            ax4.scatter([1], [current_amount], color='red', s=100, zorder=5, label='Actual (Monto)')
+            ax4.scatter([2], [current_payments], color='red', s=100, zorder=5, label='Actual (Pagos)')
+            
+            ax4.set_title('Distribución Histórica del Mes', fontweight='bold')
+            ax4.set_ylabel('Valor')
+            ax4.legend()
+            ax4.grid(True, alpha=0.3)
         else:
-            ax4.text(0.5, 0.5, 'No se encontró la columna de fecha para análisis diario', 
+            ax4.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar distribución', 
                     ha='center', va='center', transform=ax4.transAxes)
-            ax4.set_title('Evolución Diaria por Ejecutiva', fontweight='bold', fontsize=12)
+            ax4.set_title('Distribución Histórica del Mes', fontweight='bold')
         
         plt.tight_layout()
         st.pyplot(fig)
         
-        # Show summary statistics
-        st.write("**Resumen Estadístico por Ejecutiva:**")
-        exec_summary = pd.DataFrame({
-            'Ranking': range(1, len(exec_totals) + 1),
-            'Ejecutiva': exec_totals.index,
-            'Total Recuperado ($)': exec_totals.values,
-            'Participación (%)': (exec_totals / total_amount * 100).values
-        })
-        exec_summary['Total Recuperado ($)'] = exec_summary['Total Recuperado ($)'].apply(lambda x: f"${x:,.0f}")
-        exec_summary['Participación (%)'] = exec_summary['Participación (%)'].apply(lambda x: f"{x:.1f}%")
-        st.dataframe(exec_summary)
-        
+        # Show historical data table for reference
+        with st.expander("Ver datos históricos detallados"):
+            if len(mismo_mes_historico) > 0:
+                display_data = mismo_mes_historico[['año', 'mes', 'monto_total', 'num_pagos']].copy()
+                display_data['monto_total'] = display_data['monto_total'].apply(lambda x: f"${x:,.0f}")
+                display_data = display_data.sort_values('año', ascending=False)
+                st.dataframe(display_data)
+            else:
+                st.write("No hay datos históricos disponibles para este mes.")
+                
     except Exception as e:
-        st.error(f"Error en el análisis por ejecutiva: {e}")
-        st.info("ℹ️ Verifique que los datos contengan las columnas necesarias: EJECUTIVA, MONTO y FECHA_PAGO")
+        st.error(f"Error en el análisis mensual comparativo: {e}")
+        st.info("ℹ️ Verifique que los datos tengan el formato correcto")
 
 
-
+def _show_current_month_only(current_month_data):
+    """Helper function to show only current month data when no historical data is available."""
+    st.write("### Datos del Mes Actual (Sin datos históricos para comparación)")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Monto Actual", f"${current_month_data['monto_total']:,.0f}")
+    with col2:
+        st.metric("Pagos Actuales", f"${current_month_data['num_pagos']:,.0f}")
+    
+    st.info("ℹ️ Se necesitan datos de años anteriores para realizar comparativas históricas.")
 
 
 def _show_basic_stats_fallback(df: pd.DataFrame, amount_col: str):
