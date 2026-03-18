@@ -148,6 +148,9 @@ venv/
 ENV/
 env/
 
+# Sample data
+sample_data/
+
 # Temporary files
 *.tmp
 *.temp

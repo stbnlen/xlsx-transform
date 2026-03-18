@@ -93,17 +93,17 @@ def show_pagos_frm_view():
             st.dataframe(missing_display)
         else:
             st.write("No missing values found.")
-        
+         
         if 'AÑO_MES' in df_clean.columns and date_columns:
             st.write("---")
             st.subheader("📊 Monthly Aggregation Analysis")
-            
+             
             amount_col = find_amount_column(df_clean)
-            
+             
             if 'AÑO' in df_clean.columns and 'MES_NUM' in df_clean.columns and 'MONTO' in df_clean.columns:
                 try:
                     monthly = aggregate_monthly(df_clean, 'MONTO')
-                    
+                     
                     if monthly is not None and len(monthly) > 0:
                         _show_monthly_metrics(monthly)
                         _show_descriptive_stats(monthly)
@@ -113,7 +113,6 @@ def show_pagos_frm_view():
                         _show_patterns_analysis(monthly)
                         _show_correlation_analysis(monthly)
                         _show_pagos_por_ejecutiva(monthly, df_clean)
-                        _show_pagos_por_sucursal(monthly, df_clean)
                         _show_prediction_analysis(monthly, df_clean)
                     elif monthly is not None:
                         st.warning("⚠️ No historical data available for detailed analysis")
@@ -526,188 +525,7 @@ def _show_pagos_por_ejecutiva(monthly: pd.DataFrame, df_original: pd.DataFrame):
         st.info("ℹ️ Verifique que los datos contengan las columnas necesarias: EJECUTIVA, MONTO y FECHA_PAGO")
 
 
-def _show_pagos_por_sucursal(monthly: pd.DataFrame, df_original: pd.DataFrame):
-    """Display analysis of payments by sector/branch for the current month."""
-    st.write("---")
-    st.subheader("🏢 Análisis de Pagos por Sucursal/Sector (Mes Actual)")
-    st.info("""
-    **Este análisis muestra la distribución de pagos por sucursal/sector para el mes actual:**
-    1. **Ranking de sucursales**: Posición de cada sucursal según el monto total recuperado en el mes actual
-    2. **Participación porcentual**: Contribución de cada sucursal al total del mes actual
-    """)
-    
-    # Check if SECTOR column exists
-    if 'SECTOR' not in df_original.columns:
-        st.warning("⚠️ No se encontró la columna 'SECTOR' en los datos")
-        return
-        
-    try:
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        
-        # Get current month from monthly data (last row is the current/incomplete month)
-        if len(monthly) == 0:
-            st.warning("⚠️ No hay datos mensuales disponibles")
-            return
-            
-        current_month = monthly.iloc[-1]['AÑO_MES']
-        st.write(f"**Analizando datos para el mes: {current_month}**")
-        
-        # Prepare data for sector analysis - filter to current month only
-        df_sector = df_original.copy()
-        
-        # Ensure date column is datetime
-        if 'FECHA_PAGO' in df_sector.columns:
-            df_sector['FECHA_PAGO'] = pd.to_datetime(df_sector['FECHA_PAGO'])
-            df_sector['AÑO_MES'] = df_sector['FECHA_PAGO'].dt.to_period('M')
-        else:
-            st.warning("⚠️ No se encontró la columna de fecha para el análisis por sucursal")
-            return
-            
-        # Filter to only current month
-        df_sector = df_sector[df_sector['AÑO_MES'] == current_month]
-        
-        if len(df_sector) == 0:
-            st.warning(f"⚠️ No hay datos para el mes {current_month}")
-            return
-            
-        # Ensure MONTO column exists and is numeric
-        if 'MONTO' not in df_sector.columns:
-            st.warning("⚠️ No se encontró la columna 'MONTO' para el análisis por sucursal")
-            return
-            
-        df_sector['MONTO'] = pd.to_numeric(df_sector['MONTO'], errors='coerce')
-        
-        # Remove rows with missing data
-        df_sector = df_sector.dropna(subset=['SECTOR', 'MONTO'])
-        
-        if len(df_sector) == 0:
-            st.warning("⚠️ No hay datos válidos para el análisis por sucursal después de limpiar")
-            return
-        
-        # Aggregate by sector for current month only
-        sector_totals = df_sector.groupby('SECTOR')['MONTO'].sum().sort_values(ascending=False)
-        
-        if len(sector_totals) == 0:
-            st.warning("⚠️ No hay datos de sucursales para mostrar")
-            return
-        
-        # Get top sectors (show all if less than 10, otherwise top 10)
-        top_n = min(10, len(sector_totals))
-        top_sectors = sector_totals.head(top_n)
-        
-        # Create visualization
-        fig, axes = plt.subplots(2, 2, figsize=(16, 10))
-        
-        # 1. Total by sector for current month (bar chart)
-        ax1 = axes[0, 0]
-        bars = ax1.bar(range(len(top_sectors)), top_sectors.values / 1e6, 
-                      color=sns.color_palette("viridis", n_colors=len(top_sectors)))
-        ax1.set_title(f'Total Recuperado por Sucursal - {current_month}', fontweight='bold', fontsize=12)
-        ax1.set_ylabel('Millones $', fontsize=10)
-        ax1.set_xlabel('Sucursal/Sector', fontsize=10)
-        ax1.set_xticklabels(top_sectors.index, rotation=45, ha='right', fontsize=9)
-        # Add value labels on bars
-        for i, v in enumerate(top_sectors.values):
-            ax1.text(i, v/1e6, f'${v/1e6:.1f}M', ha='center', va='bottom', fontsize=9)
-        
-        # 2. Participation percentage (pie chart)
-        ax2 = axes[0, 1]
-        total_amount = sector_totals.sum()
-        if len(sector_totals) <= 8:
-            # Show all sectors if 8 or fewer
-            percentages = (sector_totals / total_amount * 100)
-        else:
-            # Show top 7 + "Otros" for better visualization
-            top_7 = sector_totals.head(7)
-            others_sum = sector_totals.iloc[7:].sum()
-            percentages = pd.concat([top_7, pd.Series([others_sum], index=['Otros'])]) / total_amount * 100
-        
-        wedges, texts, autotexts = ax2.pie(percentages.values, labels=percentages.index, 
-                                          autopct='%1.1f%%', startangle=90,
-                                          colors=sns.color_palette("viridis", n_colors=len(percentages)))
-        ax2.set_title('Participación Porcentual por Sucursal', fontweight='bold', fontsize=12)
-        # Make percentage text more readable
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(9)
-        
-        # 3. Sector ranking table
-        ax3 = axes[1, 0]
-        ax3.axis('tight')
-        ax3.axis('off')
-        
-        # Create ranking table
-        ranking_data = []
-        for i, (sector, monto) in enumerate(sector_totals.items(), 1):
-            porcentaje = (monto / total_amount * 100)
-            ranking_data.append([
-                i, 
-                sector, 
-                f"${monto:,.0f}", 
-                f"{porcentaje:.1f}%"
-            ])
-        
-        table = ax3.table(cellText=ranking_data,
-                         colLabels=['Rank', 'Sucursal/Sector', 'Monto', 'Participación'],
-                         cellLoc='center',
-                         loc='center')
-        table.auto_set_font_size(False)
-        table.set_fontsize(9)
-        table.scale(1.2, 1.5)
-        ax3.set_title(f'Ranking de Sucursales/Sectores - {current_month}', fontweight='bold', fontsize=12, pad=20)
-        
-        # 4. Daily evolution within the month (if we have daily data)
-        ax4 = axes[1, 1]
-        if 'FECHA_PAGO' in df_sector.columns:
-            # Group by day and sector for daily evolution
-            df_sector['DIA'] = df_sector['FECHA_PAGO'].dt.day
-            daily_sector = df_sector.groupby(['DIA', 'SECTOR'])['MONTO'].sum().reset_index()
-            
-            # Get top 5 sectors for daily chart to avoid overcrowding
-            top_5_sectors = sector_totals.head(5).index.tolist()
-            daily_top = daily_sector[daily_sector['SECTOR'].isin(top_5_sectors)]
-            
-            if len(daily_top) > 0:
-                for sector in top_5_sectors:
-                    sec_data = daily_top[daily_top['SECTOR'] == sector].sort_values('DIA')
-                    if len(sec_data) > 0:
-                        ax4.plot(sec_data['DIA'], sec_data['MONTO'] / 1e6, 
-                                marker='o', linewidth=2, label=sector)
-                ax4.set_title(f'Evolución Diaria por Sucursal (Top 5) - {current_month}', fontweight='bold', fontsize=12)
-                ax4.set_ylabel('Millones $', fontsize=10)
-                ax4.set_xlabel('Día del Mes', fontsize=10)
-                ax4.legend(loc='upper right', fontsize=9)
-                ax4.grid(True, alpha=0.3)
-                ax4.set_xticks(range(1, int(df_sector['DIA'].max()) + 1))
-            else:
-                ax4.text(0.5, 0.5, 'No hay suficientes datos para la evolución diaria', 
-                        ha='center', va='center', transform=ax4.transAxes)
-                ax4.set_title('Evolución Diaria por Sucursal', fontweight='bold', fontsize=12)
-        else:
-            ax4.text(0.5, 0.5, 'No se encontró la columna de fecha para análisis diario', 
-                    ha='center', va='center', transform=ax4.transAxes)
-            ax4.set_title('Evolución Diaria por Sucursal', fontweight='bold', fontsize=12)
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-        
-        # Show summary statistics
-        st.write("**Resumen Estadístico por Sucursal/Sector:**")
-        sector_summary = pd.DataFrame({
-            'Ranking': range(1, len(sector_totals) + 1),
-            'Sucursal/Sector': sector_totals.index,
-            'Total Recuperado ($)': sector_totals.values,
-            'Participación (%)': (sector_totals / total_amount * 100).values
-        })
-        sector_summary['Total Recuperado ($)'] = sector_summary['Total Recuperado ($)'].apply(lambda x: f"${x:,.0f}")
-        sector_summary['Participación (%)'] = sector_summary['Participación (%)'].apply(lambda x: f"{x:.1f}%")
-        st.dataframe(sector_summary)
-        
-    except Exception as e:
-        st.error(f"Error en el análisis por sucursal: {e}")
-        st.info("ℹ️ Verifique que los datos contengan las columnas necesarias: SECTOR, MONTO y FECHA_PAGO")
+
 
 
 def _show_basic_stats_fallback(df: pd.DataFrame, amount_col: str):
