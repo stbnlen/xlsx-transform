@@ -139,41 +139,89 @@ def show_pagos_frm_view():
 
 
 def _show_monthly_metrics(monthly: pd.DataFrame):
-    """Display monthly metrics summary."""
+    """Display monthly metrics summary with additional context."""
     MES_ACTUAL = monthly.iloc[-1]
     historico = monthly.iloc[:-1].copy().reset_index(drop=True)
     
-    col1, col2 = st.columns(2)
+    # Calculate additional metrics for context
+    if len(historico) > 0:
+        avg_monthly_amount = historico['monto_total'].mean()
+        avg_monthly_payments = historico['num_pagos'].mean()
+        amount_change = ((MES_ACTUAL['monto_total'] - avg_monthly_amount) / avg_monthly_amount * 100) if avg_monthly_amount != 0 else 0
+        payments_change = ((MES_ACTUAL['num_pagos'] - avg_monthly_payments) / avg_monthly_payments * 100) if avg_monthly_payments != 0 else 0
+    else:
+        avg_monthly_amount = avg_monthly_payments = amount_change = payments_change = 0
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
     with col1:
         st.metric("Meses históricos completos", len(historico))
+        
     with col2:
         st.metric(
             "Mes parcial actual", 
             f"{MES_ACTUAL['AÑO_MES']}", 
             f"{MES_ACTUAL['num_pagos']:.0f} pagos, ${MES_ACTUAL['monto_total']:,.0f}"
         )
+        
+    with col3:
+        if len(historico) > 0:
+            st.metric(
+                "Cambio Monto vs Promedio Histórico", 
+                f"{amount_change:+.1f}%",
+                f"${MES_ACTUAL['monto_total']:,.0f} vs ${avg_monthly_amount:,.0f}"
+            )
+        else:
+            st.metric("Promedio Histórico Monto", "Sin datos")
+            
+    with col4:
+        if len(historico) > 0:
+            st.metric(
+                "Cambio Pagos vs Promedio Histórico", 
+                f"{payments_change:+.1f}%",
+                f"{MES_ACTUAL['num_pagos']:.0f} vs {avg_monthly_payments:.0f}"
+            )
+        else:
+            st.metric("Promedio Histórico Pagos", "Sin datos")
 
 
 def _show_descriptive_stats(monthly: pd.DataFrame):
-    """Display descriptive statistics."""
+    """Display descriptive statistics with confidence intervals."""
     st.write("---")
     st.subheader("📈 Estadísticas Descriptivas Detalladas")
     
     historico = monthly.iloc[:-1].copy().reset_index(drop=True)
     y = historico['monto_total'].astype(float).values
     
+    if len(y) < 2:
+        st.warning("⚠️ Se necesitan al menos 2 puntos de datos para estadísticas descriptivas")
+        return
+    
     stats_data = calculate_descriptive_stats(y)
+    
+    # Calculate confidence interval for the mean
+    from scipy import stats as scipy_stats
+    n = len(y)
+    mean = stats_data['mean']
+    std = stats_data['std']
+    se = std / np.sqrt(n) if n > 0 else 0
+    confidence_level = 0.95
+    t_critical = scipy_stats.t.ppf((1 + confidence_level) / 2, n - 1) if n > 1 else 0
+    margin_of_error = t_critical * se
+    ci_lower = mean - margin_of_error
+    ci_upper = mean + margin_of_error
     
     metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
     
     with metrics_col1:
         st.write("**Medidas de Tendencia Central:**")
-        st.write(f"• Media: ${stats_data['mean']:,.0f}")
+        st.write(f"• Media: ${mean:,.0f}")
         st.write(f"• Mediana: ${stats_data['median']:,.0f}")
+        st.write(f"• IC 95%: [${ci_lower:,.0f}, ${ci_upper:,.0f}]")
     
     with metrics_col2:
         st.write("**Medidas de Dispersión:**")
-        st.write(f"• Desv. Estándar: ${stats_data['std']:,.0f}")
+        st.write(f"• Desv. Estándar: ${std:,.0f}")
         st.write(f"• Coef. Variación: {stats_data['cv']:.1f}%")
         st.write(f"• Rango: ${stats_data['range']:,.0f}")
     
@@ -188,6 +236,14 @@ def _show_descriptive_stats(monthly: pd.DataFrame):
             else "Asimétrica negativa (cola a la izquierda)"
         )
         st.write(f"→ {skew_interp}")
+        
+        # Add kurtosis interpretation
+        kurtosis_interp = (
+            "Mesocúrtica" if abs(stats_data['kurtosis']) < 0.5
+            else "Leptocúrtica" if stats_data['kurtosis'] > 0.5
+            else "Platicúrtica"
+        )
+        st.write(f"• Curtosis: {kurtosis_interp}")
     
     st.write("**Percentiles:**")
     percentiles = [5, 10, 25, 50, 75, 90, 95]
@@ -257,7 +313,7 @@ def _show_eda_charts(monthly: pd.DataFrame, df_original: pd.DataFrame, amount_co
 
 
 def _show_seasonal_analysis(monthly: pd.DataFrame):
-    """Display seasonal decomposition analysis."""
+    """Display seasonal decomposition analysis with enhanced insights."""
     st.write("---")
     st.subheader("🔄 Descomposición de la Serie Temporal")
     st.info("""
@@ -266,17 +322,43 @@ def _show_seasonal_analysis(monthly: pd.DataFrame):
     2. **Estacionalidad**: Patrones que se repiten en períodos regulares (mensuales)
     3. **Residuo**: Variación restante después de eliminar tendencia y estacionalidad
     """)
-    create_seasonal_decomposition_chart(monthly.iloc[:-1].copy())
     
-    seasonal_df = calculate_seasonal_indices(monthly.iloc[:-1].copy())
+    historico = monthly.iloc[:-1].copy()
+    
+    # Create seasonal decomposition chart
+    decomp = create_seasonal_decomposition_chart(historico)
+    
+    seasonal_df = calculate_seasonal_indices(historico)
     if seasonal_df is not None:
         st.write("**Índices Estacionales:**")
         st.dataframe(seasonal_df.round(4))
         st.write("**Interpretación:** Valores > 1 indican meses con recuperación superior al promedio")
+        
+        # Add seasonal strength metrics
+        if decomp is not None:
+            # Calculate strength of seasonality
+            try:
+                detrended = decomp.observed - decomp.trend
+                seasonal_var = np.var(decomp.seasonal)
+                residual_var = np.var(decomp.resid)
+                if seasonal_var + residual_var > 0:
+                    Fs = seasonal_var / (seasonal_var + residual_var)
+                    Fs = max(0, min(1, Fs))  # Bound between 0 and 1
+                    st.write(f"**Fuerza de la Estacionalidad (Fs):** {Fs:.3f}")
+                    if Fs > 0.6:
+                        st.write("→ Alta estacionalidad detectada")
+                    elif Fs > 0.3:
+                        st.write("→ Estacionalidad moderada detectada")
+                    else:
+                        st.write("→ Baja estacionalidad detectada")
+            except:
+                pass  # Skip if calculation fails
+    else:
+        st.info("ℹ️ No se pudo calcular el descomposición estacional. Se necesitan al menos 2 años de datos mensuales.")
 
 
 def _show_trend_analysis(monthly: pd.DataFrame):
-    """Display trend analysis."""
+    """Display trend analysis with additional metrics."""
     st.write("---")
     st.subheader("📈 Análisis de Tendencia")
     st.info("""
@@ -286,11 +368,78 @@ def _show_trend_analysis(monthly: pd.DataFrame):
     3. **Distribución**: Histograma que muestra la frecuencia de diferentes valores de recuperación
     4. **Recuperación Acumulada**: Suma progresiva de los montos a lo largo del tiempo
     """)
-    create_trend_analysis(monthly.iloc[:-1].copy())
+    
+    historico = monthly.iloc[:-1].copy()
+    
+    if len(historico) < 2:
+        st.warning("⚠️ Se necesitan al menos 2 puntos de datos para análisis de tendencia")
+        return
+    
+    # Calculate additional trend metrics
+    from scipy import stats as scipy_stats
+    import numpy as np
+    
+    # Prepare data
+    y = historico['monto_total'].values
+    x = np.arange(len(y))
+    
+    # Calculate linear trend
+    slope, intercept, r_value, p_value, std_err = scipy_stats.linregress(x, y)
+    
+    # Calculate R-squared
+    r_squared = r_value ** 2
+    
+    # Calculate trend significance
+    trend_significant = p_value < 0.05
+    
+    # Calculate percentage change from first to last period
+    if len(y) >= 2 and y[0] != 0:
+        pct_change = ((y[-1] - y[0]) / y[0]) * 100
+    else:
+        pct_change = 0
+    
+    # Display trend metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Tendencia Lineal", 
+            f"{slope:,.0f} por mes",
+            f"R² = {r_squared:.3f}"
+        )
+    
+    with col2:
+        st.metric(
+            "Significancia de Tendencia", 
+            "Significativa" if trend_significant else "No significativa",
+            f"p-value = {p_value:.4f}"
+        )
+    
+    with col3:
+        st.metric(
+            "Cambio Total", 
+            f"{pct_change:+.1f}%",
+            f"Del primer al último período"
+        )
+    
+    with col4:
+        # Calculate compound monthly growth rate
+        if len(y) >= 2 and y[0] > 0:
+            cmgr = (y[-1] / y[0]) ** (1/len(y)) - 1
+            st.metric(
+                "Tasa Crec. Mensual Compuesta", 
+                f"{cmgr*100:+.2f}%",
+                f"Por período"
+            )
+        else:
+            st.metric("Tasa Crec. Mensual Compuesta", "N/A")
+    
+    # Create the trend visualization
+    create_trend_analysis(historico)
 
 
 def _show_patterns_analysis(monthly: pd.DataFrame):
-    """Display yearly and monthly patterns."""
+    """Display yearly and monthly patterns with enhanced insights."""
     st.write("---")
     st.subheader("📅 Patrones Anuales y Mensuales")
     st.info("""
@@ -302,21 +451,67 @@ def _show_patterns_analysis(monthly: pd.DataFrame):
     
     historico = monthly.iloc[:-1].copy().reset_index(drop=True)
     
+    if len(historico) < 2:
+        st.warning("⚠️ Se necesitan al menos 2 puntos de datos para análisis de patrones")
+        return
+    
     yearly = calculate_yearly_stats(historico)
     st.write("**Estadísticas por Año:**")
     st.dataframe(yearly.round(2))
     
     create_year_growth_chart(yearly)
     
+    # Add yearly insights
+    if len(yearly) >= 2:
+        latest_year = yearly.iloc[-1]
+        prev_year = yearly.iloc[-2] if len(yearly) >= 2 else None
+        
+        if prev_year is not None:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(
+                    "Crecimiento Anual Promedio", 
+                    f"{latest_year['crecimiento']:.1f}%" if not pd.isna(latest_year['crecimiento']) else "N/A"
+                )
+            with col2:
+                st.metric(
+                    "Volatilidad Anual (CV)", 
+                    f"{latest_year['cv']:.1f}%" if not pd.isna(latest_year['cv']) else "N/A"
+                )
+            with col3:
+                st.metric(
+                    "Total Recuperado Año Actual", 
+                    f"${latest_year['sum']:,.0f}" if not pd.isna(latest_year['sum']) else "N/A"
+                )
+    
     monthly_stats = calculate_monthly_stats(historico)
     st.write("**Estadísticas por Mes (Patrón Estacional):**")
     st.dataframe(monthly_stats.round(2))
     
     create_monthly_pattern_chart(historico)
+    
+    # Add seasonal insights
+    if len(monthly_stats) > 0:
+        # Find peak and low months
+        peak_month = monthly_stats['mean'].idxmax()
+        low_month = monthly_stats['mean'].idxmin()
+        
+        peak_value = monthly_stats.loc[peak_month, 'mean']
+        low_value = monthly_stats.loc[low_month, 'mean']
+        
+        if peak_value > 0 and low_value > 0:
+            seasonal_ratio = peak_value / low_value
+            st.write(f"**Ratio Estacional (Pico/Valle):** {seasonal_ratio:.2f}x")
+            if seasonal_ratio > 2:
+                st.write("→ Fuerte variabilidad estacional detectada")
+            elif seasonal_ratio > 1.5:
+                st.write("→ Variabilidad estacional moderada detectada")
+            else:
+                st.write("→ Baja variabilidad estacional")
 
 
 def _show_correlation_analysis(monthly: pd.DataFrame):
-    """Display correlation analysis."""
+    """Display correlation analysis with significance testing."""
     st.write("---")
     st.subheader("🔗 Análisis de Correlaciones")
     st.info("""
@@ -325,17 +520,59 @@ def _show_correlation_analysis(monthly: pd.DataFrame):
     2. **Correlaciones con Monto Total**: Valores numéricos que indican cómo cada variable se relaciona con el monto total recuperado
     """)
     
+    if monthly.shape[1] < 2:
+        st.info("ℹ️ No hay suficientes columnas numéricas para análisis de correlaciones")
+        return
+    
+    if 'monto_total' not in monthly.columns:
+        st.warning("⚠️ La columna 'monto_total' no está disponible para correlación")
+        return
+    
+    # Create correlation heatmap
     create_correlation_heatmap(monthly)
     
+    # Calculate correlations with significance
     corr_df = calculate_correlations(monthly)
     
     if corr_df is not None:
         st.write("**Correlaciones con Monto Total:**")
-        st.dataframe(corr_df)
-    elif monthly.shape[1] < 2:
-        st.info("ℹ️ No hay suficientes columnas numéricas para análisis de correlaciones")
+        
+        # Add significance indicators if we can calculate them
+        try:
+            from scipy import stats as scipy_stats
+            import numpy as np
+            
+            # Prepare data for correlation testing
+            numeric_cols = [col for col in monthly.columns if col != 'monto_total' and 
+                           pd.api.types.is_numeric_dtype(monthly[col])]
+            
+            if len(numeric_cols) > 0 and len(monthly) > 2:
+                # Calculate correlations with p-values
+                corr_details = []
+                for col in numeric_cols:
+                    # Remove NaN values for correlation calculation
+                    valid_data = monthly[['monto_total', col]].dropna()
+                    if len(valid_data) > 2:
+                        corr_val, p_val = scipy_stats.pearsonr(valid_data['monto_total'], valid_data[col])
+                        corr_details.append({
+                            'Variable': col,
+                            'Correlación': f"{corr_val:.3f}",
+                            'p-valor': f"{p_val:.4f}",
+                            'Significativo': "Sí" if p_val < 0.05 else "No"
+                        })
+                
+                if corr_details:
+                    detail_df = pd.DataFrame(corr_details)
+                    st.dataframe(detail_df)
+                else:
+                    st.dataframe(corr_df)
+            else:
+                st.dataframe(corr_df)
+        except:
+            # Fallback to original display if significance testing fails
+            st.dataframe(corr_df)
     else:
-        st.warning("⚠️ La columna 'monto_total' no está disponible para correlación")
+        st.warning("⚠️ No se pudieron calcular correlaciones")
 
 
 
@@ -343,15 +580,15 @@ def _show_correlation_analysis(monthly: pd.DataFrame):
 
 
 def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.DataFrame):
-    """Display comparative analysis of current month vs historical data for the same month."""
+    """Display comparative analysis of current month vs historical data for the same month up to the same day."""
     st.write("---")
-    st.subheader("📊 Análisis Mensual Comparativo")
+    st.subheader("📊 Análisis Mensual Comparativo (Hasta el Día Actual)")
     st.info("""
-    **Este análisis compara el mes actual con el mismo mes en años anteriores:**
-    1. **Valores actuales**: Monto total y número de pagos del mes actual
-    2. **Promedio histórico**: Promedio del mismo mes en años anteriores
+    **Este análisis compara el mes actual hasta el día de hoy con el mismo período en años anteriores:**
+    1. **Valores actuales**: Monto total y número de pagos del mes actual hasta hoy
+    2. **Promedio histórico**: Promedio del mismo período (hasta el mismo día) en años anteriores
     3. **Variación porcentual**: Cambio porcentual respecto al promedio histórico
-    4. **Tendencia**: Evolución del mismo mes a lo largo de los años
+    4. **Tendencia**: Evolución del mismo período a lo largo de los años
     """)
     
     try:
@@ -381,21 +618,42 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
                 st.error("⚠️ No se pudo extraer el año y mes de los datos")
                 return
         
-        # Get historical data (excluding current month for comparison)
-        historico = monthly.iloc[:-1].copy()
+        # Get the current day of month from the original data for the current year and month
+        current_day_data = df_original[
+            (df_original['AÑO'] == current_year) & 
+            (df_original['MES_NUM'] == current_month_num)
+        ]
+        if len(current_day_data) > 0:
+            current_day_of_month = int(current_day_data['DIA'].max())
+        else:
+            # If no data for current year/month (should not happen), fallback to using the month length
+            current_day_of_month = monthly.iloc[-1]['dias_mes'] if 'dias_mes' in monthly.columns else 30
         
-        if len(historico) == 0:
-            st.warning("⚠️ No hay datos históricos disponibles para comparación")
+        st.write(f"**Comparando hasta el día {current_day_of_month} del mes {current_month_num}**")
+        
+        # Filter historical data (excluding current year) for same month and day <= current_day_of_month
+        historical_mask = (
+            (df_original['MES_NUM'] == current_month_num) &
+            (df_original['DIA'] <= current_day_of_month) &
+            (df_original['AÑO'] < current_year)
+        )
+        
+        historical_data = df_original[historical_mask]
+        
+        if len(historical_data) == 0:
+            st.warning("⚠️ No hay datos históricos disponibles para el mismo período (hasta el día actual) en años anteriores.")
             # Still show current month data
             _show_current_month_only(current_month_data)
             return
         
-        # Filter historical data for the same month number
-        mismo_mes_historico = historico[historico['mes'] == current_month_num]
+        # Aggregate by year to get yearly totals up to the current day
+        historical_yearly = historical_data.groupby('AÑO').agg(
+            monto_total=('MONTO', 'sum'),
+            num_pagos=('MONTO', 'count')
+        ).reset_index()
         
-        if len(mismo_mes_historico) == 0:
-            st.warning(f"⚠️ No hay datos históricos para el mes {current_month_num} para comparar")
-            # Still show current month data
+        if len(historical_yearly) == 0:
+            st.warning("⚠️ No se pudieron calcular agregados anuales históricos.")
             _show_current_month_only(current_month_data)
             return
         
@@ -403,11 +661,11 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
         current_amount = current_month_data['monto_total']
         current_payments = current_month_data['num_pagos']
         
-        historical_avg_amount = mismo_mes_historico['monto_total'].mean()
-        historical_avg_payments = mismo_mes_historico['num_pagos'].mean()
+        historical_avg_amount = historical_yearly['monto_total'].mean()
+        historical_avg_payments = historical_yearly['num_pagos'].mean()
         
         # Calculate year-over-year change (if we have previous year data)
-        previous_year_data = mismo_mes_historico[mismo_mes_historico['año'] == current_year - 1]
+        previous_year_data = historical_yearly[historical_yearly['AÑO'] == current_year - 1]
         yoy_change_amount = None
         yoy_change_payments = None
         
@@ -424,6 +682,32 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
         pct_change_amount = ((current_amount - historical_avg_amount) / historical_avg_amount * 100) if historical_avg_amount != 0 else 0
         pct_change_payments = ((current_payments - historical_avg_payments) / historical_avg_payments * 100) if historical_avg_payments != 0 else 0
         
+        # Calculate statistical significance of the difference from historical average (using yearly values)
+        try:
+            from scipy import stats as scipy_stats
+            # Perform t-test comparing current month to historical yearly same-month-up-to-day data
+            if len(historical_yearly) > 1:
+                # For amount
+                t_stat_amount, p_val_amount = scipy_stats.ttest_1samp(
+                    historical_yearly['monto_total'].values, 
+                    current_amount
+                )
+                # For payments
+                t_stat_payments, p_val_payments = scipy_stats.ttest_1samp(
+                    historical_yearly['num_pagos'].values, 
+                    current_payments
+                )
+                
+                # Determine significance
+                sig_amount = p_val_amount < 0.05
+                sig_payments = p_val_payments < 0.05
+            else:
+                p_val_amount = p_val_payments = 1.0
+                sig_amount = sig_payments = False
+        except:
+            p_val_amount = p_val_payments = 1.0
+            sig_amount = sig_payments = False
+        
         # Display metrics in columns
         col1, col2, col3, col4 = st.columns(4)
         
@@ -433,6 +717,10 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
                 f"${current_amount:,.0f}",
                 f"{pct_change_amount:+.1f}% vs promedio histórico"
             )
+            # Add significance indicator
+            if len(historical_yearly) > 1:
+                sig_text = " (significativo)" if sig_amount else " (no significativo)"
+                st.caption(f"p-valor: {p_val_amount:.4f}{sig_text}")
             
         with col2:
             st.metric(
@@ -440,6 +728,10 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
                 f"{current_payments:,.0f}",
                 f"{pct_change_payments:+.1f}% vs promedio histórico"
             )
+            # Add significance indicator
+            if len(historical_yearly) > 1:
+                sig_text = " (significativo)" if sig_payments else " (no significativo)"
+                st.caption(f"p-valor: {p_val_payments:.4f}{sig_text}")
             
         with col3:
             if yoy_change_amount is not None:
@@ -470,7 +762,7 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
         # Create visualization
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         
-        # 1. Bar chart: Current vs Historical Average
+        # 1. Bar chart: Current vs Historical Average (with dual Y-axis for different scales)
         ax1 = axes[0, 0]
         categories = ['Monto Total', 'Número de Pagos']
         current_values = [current_amount, current_payments]
@@ -479,36 +771,68 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
         x = np.arange(len(categories))
         width = 0.35
         
-        bars1 = ax1.bar(x - width/2, current_values, width, label='Actual', color='skyblue', alpha=0.8)
-        bars2 = ax1.bar(x + width/2, historical_values, width, label='Promedio Histórico', color='lightcoral', alpha=0.8)
+        # Plot monetary values (left Y-axis)
+        bars1_monto = ax1.bar(x[0] - width/2, current_values[0], width, label='Monto Actual', color='skyblue', alpha=0.8)
+        bars2_monto = ax1.bar(x[0] + width/2, historical_values[0], width, label='Monto Histórico', color='lightcoral', alpha=0.8)
         
-        ax1.set_title('Comparación: Actual vs Promedio Histórico', fontweight='bold')
-        ax1.set_ylabel('Valor')
+        # Create second Y-axis for payment counts
+        ax1_twin = ax1.twinx()
+        
+        # Plot payment counts (right Y-axis)
+        bars1_pagos = ax1_twin.bar(x[1] - width/2, current_values[1], width, label='Pagos Actual', color='green', alpha=0.8)
+        bars2_pagos = ax1_twin.bar(x[1] + width/2, historical_values[1], width, label='Pagos Histórico', color='orange', alpha=0.8)
+        
+        # Configure axes
+        ax1.set_xlabel('Tipo de Métrica')
+        ax1.set_ylabel('Monto Total ($)', color='skyblue')
+        ax1_twin.set_ylabel('Número de Pagos', color='green')
+        ax1.tick_params(axis='y', labelcolor='skyblue')
+        ax1_twin.tick_params(axis='y', labelcolor='green')
+        
+        # Set x-axis labels
         ax1.set_xticks(x)
         ax1.set_xticklabels(categories)
-        ax1.legend()
+        
+        # Create combined legend
+        bars1 = [bars1_monto[0], bars1_pagos[0]]
+        bars2 = [bars2_monto[0], bars2_pagos[0]]
+        ax1.legend(bars1, ['Monto Actual', 'Pagos Actual'], loc='upper left')
+        ax1_twin.legend(bars2, ['Monto Histórico', 'Pagos Histórico'], loc='upper right')
+        
+        ax1.set_title('Comparación: Actual vs Promedio Histórico', fontweight='bold')
         
         # Add value labels on bars
-        def autolabel(bars):
+        def autolabel_monto(bars):
             for bar in bars:
                 height = bar.get_height()
-                ax1.annotate(f'{height:,.0f}',
+                ax1.annotate(f'${height:,.0f}',
                             xy=(bar.get_x() + bar.get_width() / 2, height),
                             xytext=(0, 3),  # 3 points vertical offset
                             textcoords="offset points",
-                            ha='center', va='bottom', fontsize=9)
+                            ha='center', va='bottom', fontsize=9, color='black')
         
-        autolabel(bars1)
-        autolabel(bars2)
+        def autolabel_pagos(bars):
+            for bar in bars:
+                height = bar.get_height()
+                ax1_twin.annotate(f'{height:,.0f}',
+                                 xy=(bar.get_x() + bar.get_width() / 2, height),
+                                 xytext=(0, 3),  # 3 points vertical offset
+                                 textcoords="offset points",
+                                 ha='center', va='bottom', fontsize=9, color='black')
         
-        # 2. Line chart: Historical trend for same month
+        autolabel_monto(bars1_monto)
+        autolabel_monto(bars2_monto)
+        autolabel_pagos(bars1_pagos)
+        autolabel_pagos(bars2_pagos)
+        
+        # 2. Line chart: Historical trend for same month up to day
         ax2 = axes[0, 1]
-        if len(mismo_mes_historico) > 0:
+        if len(historical_yearly) > 0:
             # Sort by year for proper line chart
-            mismo_mes_sorted = mismo_mes_historico.sort_values('año')
-            años = mismo_mes_sorted['año'].tolist()
-            montos = mismo_mes_sorted['monto_total'].tolist()
-            pagos = mismo_mes_sorted['num_pagos'].tolist()
+            historical_yearly_sorted = historical_yearly.sort_values('AÑO')
+            años = historical_yearly_sorted['AÑO'].tolist()
+            montos = historical_yearly_sorted['monto_total'].tolist()
+            pagos = historical_yearly_sorted['num_pagos'].tolist()
             
             ax2_twin = ax2.twinx()
             
@@ -516,15 +840,15 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
             line2 = ax2_twin.plot(años, pagos, 'r-s', label='Número de Pagos', linewidth=2, markersize=4)
             
             # Highlight current year if it exists in historical data (shouldn't, but just in case)
-            current_in_historico = mismo_mes_historico[mismo_mes_historico['año'] == current_year]
-            if len(current_in_historico) > 0:
-                ax2.plot(current_year, current_in_historico.iloc[0]['monto_total'], 'b*', markersize=12, label='Actual')
-                ax2_twin.plot(current_year, current_in_historico.iloc[0]['num_pagos'], 'r*', markersize=12, label='Actual')
+            current_in_historical = historical_yearly[historical_yearly['AÑO'] == current_year]
+            if len(current_in_historical) > 0:
+                ax2.plot(current_year, current_in_historical.iloc[0]['monto_total'], 'b*', markersize=12, label='Actual')
+                ax2_twin.plot(current_year, current_in_historical.iloc[0]['num_pagos'], 'r*', markersize=12, label='Actual')
             
             ax2.set_xlabel('Año')
             ax2.set_ylabel('Monto Total ($)', color='b')
             ax2_twin.set_ylabel('Número de Pagos', color='r')
-            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num}', fontweight='bold')
+            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num} (hasta día {current_day_of_month})', fontweight='bold')
             
             # Combine legends
             lines1, labels1 = ax2.get_legend_handles_labels()
@@ -535,7 +859,7 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
         else:
             ax2.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar tendencia', 
                     ha='center', va='center', transform=ax2.transAxes)
-            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num}', fontweight='bold')
+            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num} (hasta día {current_day_of_month})', fontweight='bold')
         
         # 3. Waterfall chart showing contributions to change from historical average
         ax3 = axes[1, 0]
@@ -578,10 +902,10 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
                     f'{value:,.0f}', ha='center', 
                     va='bottom' if height >= 0 else 'top', fontsize=9)
         
-        # 4. Box plot showing distribution of historical data for same month
+        # 4. Box plot showing distribution of historical data for same month up to day
         ax4 = axes[1, 1]
-        if len(mismo_mes_historico) > 0:
-            box_data = [mismo_mes_historico['monto_total'].values, mismo_mes_historico['num_pagos'].values]
+        if len(historical_yearly) > 0:
+            box_data = [historical_yearly['monto_total'].values, historical_yearly['num_pagos'].values]
             box_plot = ax4.boxplot(box_data, labels=['Monto Total', 'Número de Pagos'], patch_artist=True)
             
             # Color the boxes
@@ -593,27 +917,28 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
             ax4.scatter([1], [current_amount], color='red', s=100, zorder=5, label='Actual (Monto)')
             ax4.scatter([2], [current_payments], color='red', s=100, zorder=5, label='Actual (Pagos)')
             
-            ax4.set_title('Distribución Histórica del Mes', fontweight='bold')
+            ax4.set_title('Distribución Histórica (hasta día)', fontweight='bold')
             ax4.set_ylabel('Valor')
             ax4.legend()
             ax4.grid(True, alpha=0.3)
         else:
             ax4.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar distribución', 
                     ha='center', va='center', transform=ax4.transAxes)
-            ax4.set_title('Distribución Histórica del Mes', fontweight='bold')
+            ax4.set_title('Distribución Histórica (hasta día)', fontweight='bold')
         
         plt.tight_layout()
         st.pyplot(fig)
         
         # Show historical data table for reference
         with st.expander("Ver datos históricos detallados"):
-            if len(mismo_mes_historico) > 0:
-                display_data = mismo_mes_historico[['año', 'mes', 'monto_total', 'num_pagos']].copy()
-                display_data['monto_total'] = display_data['monto_total'].apply(lambda x: f"${x:,.0f}")
-                display_data = display_data.sort_values('año', ascending=False)
+            if len(historical_yearly) > 0:
+                display_data = historical_yearly[['AÑO', 'monto_total', 'num_pagos']].copy()
+                if 'monto_total' in display_data.columns:
+                    display_data['monto_total'] = display_data['monto_total'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "$0")
+                display_data = display_data.sort_values('AÑO', ascending=False)
                 st.dataframe(display_data)
             else:
-                st.write("No hay datos históricos disponibles para este mes.")
+                st.write("No hay datos históricos disponibles para este período.")
                 
     except Exception as e:
         st.error(f"Error en el análisis mensual comparativo: {e}")

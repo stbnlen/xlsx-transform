@@ -305,7 +305,7 @@ def calculate_correlations(df: pd.DataFrame) -> Optional[pd.DataFrame]:
 
 
 def create_eda_charts(historico: pd.DataFrame, df_original: pd.DataFrame, amount_col: str):
-    """Create exploratory data analysis charts using seaborn.
+    """Create exploratory data analysis charts using seaborn with enhanced annotations.
     
     Args:
         historico: Monthly aggregated historical data
@@ -315,6 +315,7 @@ def create_eda_charts(historico: pd.DataFrame, df_original: pd.DataFrame, amount
     try:
         import seaborn as sns
         import matplotlib.pyplot as plt
+        import numpy as np
         
         # Ensure historico['monto_total'] is numeric
         if not pd.api.types.is_numeric_dtype(historico['monto_total']):
@@ -356,6 +357,12 @@ def create_eda_charts(historico: pd.DataFrame, df_original: pd.DataFrame, amount
         ax1.set_ylabel('Millones $', fontsize=10)
         ax1.set_xlabel('Mes', fontsize=10)
         ax1.legend(loc='upper right')
+        
+        # Add value labels on bars
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{height:.1f}M', ha='center', va='bottom', fontsize=9)
         
         # 2. Boxplot by month
         ax2 = axes[0, 1]
@@ -410,15 +417,15 @@ def create_eda_charts(historico: pd.DataFrame, df_original: pd.DataFrame, amount
                     del temp_df['_numeric_amount']
                 else:
                     ax4.text(0.5, 0.5, 'No se pueden sumar los valores de monto (no numéricos)', 
-                             ha='center', va='center', transform=ax4.transAxes)
+                            ha='center', va='center', transform=ax4.transAxes)
                     ax4.set_title('Distribución por Tipo', fontweight='bold', fontsize=12, pad=10)
             else:
                 ax4.text(0.5, 0.5, 'No hay columna de tipo de pago', 
-                         ha='center', va='center', transform=ax4.transAxes)
+                        ha='center', va='center', transform=ax4.transAxes)
                 ax4.set_title('Distribución por Tipo', fontweight='bold', fontsize=12, pad=10)
         else:
             ax4.text(0.5, 0.5, 'No hay columna de monto', 
-                     ha='center', va='center', transform=ax4.transAxes)
+                    ha='center', va='center', transform=ax4.transAxes)
             ax4.set_title('Distribución por Tipo', fontweight='bold', fontsize=12, pad=10)
         
         plt.tight_layout()
