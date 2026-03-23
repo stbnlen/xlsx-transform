@@ -1253,15 +1253,25 @@ def _show_prediction_analysis(monthly: pd.DataFrame, df_original: pd.DataFrame):
         
         # Train final models on all data and predict
         print("Training final models...")
+        # Store feature importance for each model
+        feature_importance_pagos = {}
+        feature_importance_monto = {}
+        
         for nombre, modelo in modelos_pagos.items():
             modelo.fit(X_scaled, y_pagos_clean)
             pred = modelo.predict(X_pred_scaled)[0]
             pred_pagos[nombre] = max(0, pred)  # Ensure non-negative
+            # Extract feature importance if available
+            if hasattr(modelo, 'feature_importances_'):
+                feature_importance_pagos[nombre] = modelo.feature_importances_
         
         for nombre, modelo in modelos_monto.items():
             modelo.fit(X_scaled, y_monto_clean)
             pred = modelo.predict(X_pred_scaled)[0]
             pred_monto[nombre] = max(0, pred)  # Ensure non-negative
+            # Extract feature importance if available
+            if hasattr(modelo, 'feature_importances_'):
+                feature_importance_monto[nombre] = modelo.feature_importances_
         
         # Calculate ensemble predictions
         pred_pagos_ensemble = sum(pred_pagos[n] * resultados_pagos[n]['normalized_weight'] for n in pred_pagos)
@@ -1317,17 +1327,177 @@ def _show_prediction_analysis(monthly: pd.DataFrame, df_original: pd.DataFrame):
             pagos_df = pd.DataFrame({
                 'Modelo': list(pred_pagos.keys()),
                 'Predicción': [f"{pred_pagos[n]:,.0f}" for n in pred_pagos.keys()],
-                'Peso': [f"{resultados_pagos[n]['normalized_weight']:.1%}" for n in pred_pagos.keys()]
+                'Peso': [f"{resultados_pagos[n]['normalized_weight']:.1%}" for n in pred_pagos.keys()],
+                'MAE': [f"{resultados_pagos[n]['MAE']:,.2f}" for n in pred_pagos.keys()],
+                'MAPE': [f"{resultados_pagos[n]['MAPE']:.2f}%" for n in pred_pagos.keys()]
             })
             st.dataframe(pagos_df)
+            
+            # Explanation of metrics
+            st.info("""
+            **Entendiendo las métricas:**
+            - **MAE (Error Absoluto Medio)**: Promedio de las diferencias absolutas entre las predicciones y los valores reales. Indica cuánto se equivoca el modelo en promedio, en las mismas unidades que la variable objetivo (por ejemplo, número de pagos o monto en pesos).
+            - **MAPE (Error Porcentual Absoluto Medio)**: Promedio de los errores porcentuales absolutos. Muestra el error como porcentaje del valor real, lo que permite comparar la precisión entre diferentes escalas.
+            """)
+            
+            # Feature importance for pagos
+            if feature_importance_pagos:
+                st.write("**Importancia de Características (Pagos):**")
+                # Get feature names from the cleaned features
+                feature_names = crear_features(df_hist).dropna(axis=1, how='all').columns.tolist()
+                # Remove target columns if they got included
+                feature_names = [f for f in feature_names if f not in ['monto_total', 'num_pagos']]
+                
+                # Calculate average importance across models
+                avg_importance = np.mean([feature_importance_pagos[model] for model in feature_importance_pagos.keys()], axis=0)
+                
+                # Create dataframe for display and get top 5 features
+                importance_df_pagos = pd.DataFrame({
+                    'Característica': feature_names,
+                    'Importancia': avg_importance
+                }).sort_values('Importancia', ascending=False)
+                
+                # Get top 5 features
+                top_features = importance_df_pagos.head(5)
+                
+                # Define descriptions for each feature
+                feature_descriptions = {
+                    'monto_lag_1': 'Monto del mes anterior - Indica la tendencia inmediata de recuperación',
+                    'monto_lag_2': 'Monto de hace 2 meses - Patrón a corto plazo',
+                    'monto_lag_3': 'Monto de hace 3 meses - Influencia trimestral',
+                    'monto_lag_6': 'Monto de hace 6 meses - Patrón semestral',
+                    'monto_lag_12': 'Monto de hace 12 meses - Estacionalidad anual',
+                    'monto_ma_3': 'Media móvil de 3 meses - Tendencia a corto plazo suavizada',
+                    'monto_ma_6': 'Media móvil de 6 meses - Tendencia intermedia',
+                    'monto_ma_12': 'Media móvil de 12 meses - Tendencia anual',
+                    'monto_std_6': 'Desviación estándar de 6 meses - Volatilidad reciente',
+                    'monto_diff_1': 'Cambio mensual del monto - Momentum inmediato',
+                    'monto_diff_12': 'Cambio anual del monto - Momentum estacional',
+                    'num_pagos_lag_1': 'Número de pagos del mes anterior - Volumen inmediato',
+                    'num_pagos_lag_2': 'Número de pagos de hace 2 meses - Volumen a corto plazo',
+                    'num_pagos_lag_3': 'Número de pagos de hace 3 meses - Volumen trimestral',
+                    'num_pagos_lag_6': 'Número de pagos de hace 6 meses - Volumen semestral',
+                    'num_pagos_lag_12': 'Número de pagos de hace 12 meses - Volumen anual',
+                    'num_pagos_ma_3': 'Media móvil de pagos (3 meses) - Tendencia de volumen',
+                    'num_pagos_ma_6': 'Media móvil de pagos (6 meses) - Tendencia de volumen intermedia',
+                    'num_pagos_ma_12': 'Media móvil de pagos (12 meses) - Tendencia de volumen anual',
+                    'num_pagos_std_6': 'Desviación estándar de pagos (6 meses) - Volatilidad de volumen',
+                    'num_pagos_diff_1': 'Cambio mensual en número de pagos - Momentum de volumen',
+                    'num_pagos_diff_12': 'Cambio anual en número de pagos - Momentum estacional de volumen',
+                    'año': 'Año actual - Factor de tendencia temporal',
+                    'mes': 'Mes actual - Factor estacional',
+                    'pct_judicial': 'Porcentaje de casos judiciales - Impacto de procesos legales',
+                    'pct_castigo': 'Porcentaje de casos con castigo - Impacto de medidas punitivas',
+                    'dias_mes': 'Número de días en el mes - Factor de oportunidad de recuperación'
+                }
+                
+                # Create display with descriptions
+                display_data = []
+                for _, row in top_features.iterrows():
+                    feature = row['Característica']
+                    importance = row['Importancia']
+                    description = feature_descriptions.get(feature, 'Característica derivada de datos históricos')
+                    display_data.append({
+                        'Característica': feature,
+                        'Importancia': f"{importance:.3f}",
+                        'Descripción': description
+                    })
+                
+                display_df = pd.DataFrame(display_data)
+                st.dataframe(display_df, hide_index=True)
+                
+                # Add explanation
+                st.caption("""Las características con mayor importancia tienen más influencia en las predicciones.
+                Los lags muestran valores históricos, las medias móviles muestran tendencias suavizadas,
+                y las diferencias muestran cambios momentáneos.""")
             
             st.write("**Predicción de Monto Total:**")
             monto_df = pd.DataFrame({
                 'Modelo': list(pred_monto.keys()),
                 'Predicción': [f"${pred_monto[n]:,.0f}" for n in pred_monto.keys()],
-                'Peso': [f"{resultados_monto[n]['normalized_weight']:.1%}" for n in pred_monto.keys()]
+                'Peso': [f"{resultados_monto[n]['normalized_weight']:.1%}" for n in pred_monto.keys()],
+                'MAE': [f"{resultados_monto[n]['MAE']:,.2f}" for n in pred_monto.keys()],
+                'MAPE': [f"{resultados_monto[n]['MAPE']:.2f}%" for n in pred_monto.keys()]
             })
             st.dataframe(monto_df)
+            
+            # Explanation of metrics
+            st.info("""
+            **Entendiendo las métricas:**
+            - **MAE (Error Absoluto Medio)**: Promedio de las diferencias absolutas entre las predicciones y los valores reales. Indica cuánto se equivoca el modelo en promedio, en las mismas unidades que la variable objetivo (por ejemplo, número de pagos o monto en pesos).
+            - **MAPE (Error Porcentual Absoluto Medio)**: Promedio de los errores porcentuales absolutos. Muestra el error como porcentaje del valor real, lo que permite comparar la precisión entre diferentes escalas.
+            """)
+            
+            # Feature importance for monto
+            if feature_importance_monto:
+                st.write("**Importancia de Características (Monto):**")
+                # Get feature names from the cleaned features
+                feature_names = crear_features(df_hist).dropna(axis=1, how='all').columns.tolist()
+                # Remove target columns if they got included
+                feature_names = [f for f in feature_names if f not in ['monto_total', 'num_pagos']]
+                
+                # Calculate average importance across models
+                avg_importance = np.mean([feature_importance_monto[model] for model in feature_importance_monto.keys()], axis=0)
+                
+                # Create dataframe for display and get top 5 features
+                importance_df_monto = pd.DataFrame({
+                    'Característica': feature_names,
+                    'Importancia': avg_importance
+                }).sort_values('Importancia', ascending=False)
+                
+                # Get top 5 features
+                top_features = importance_df_monto.head(5)
+                
+                # Define descriptions for each feature
+                feature_descriptions = {
+                    'monto_lag_1': 'Monto del mes anterior - Indica la tendencia inmediata de recuperación',
+                    'monto_lag_2': 'Monto de hace 2 meses - Patrón a corto plazo',
+                    'monto_lag_3': 'Monto de hace 3 meses - Influencia trimestral',
+                    'monto_lag_6': 'Monto de hace 6 meses - Patrón semestral',
+                    'monto_lag_12': 'Monto de hace 12 meses - Estacionalidad anual',
+                    'monto_ma_3': 'Media móvil de 3 meses - Tendencia a corto plazo suavizada',
+                    'monto_ma_6': 'Media móvil de 6 meses - Tendencia intermedia',
+                    'monto_ma_12': 'Media móvil de 12 meses - Tendencia anual',
+                    'monto_std_6': 'Desviación estándar de 6 meses - Volatilidad reciente',
+                    'monto_diff_1': 'Cambio mensual del monto - Momentum inmediato',
+                    'monto_diff_12': 'Cambio anual del monto - Momentum estacional',
+                    'num_pagos_lag_1': 'Número de pagos del mes anterior - Volumen inmediato',
+                    'num_pagos_lag_2': 'Número de pagos de hace 2 meses - Volumen a corto plazo',
+                    'num_pagos_lag_3': 'Número de pagos de hace 3 meses - Volumen trimestral',
+                    'num_pagos_lag_6': 'Número de pagos de hace 6 meses - Volumen semestral',
+                    'num_pagos_lag_12': 'Número de pagos de hace 12 meses - Volumen anual',
+                    'num_pagos_ma_3': 'Media móvil de pagos (3 meses) - Tendencia de volumen',
+                    'num_pagos_ma_6': 'Media móvil de pagos (6 meses) - Tendencia de volumen intermedia',
+                    'num_pagos_ma_12': 'Media móvil de pagos (12 meses) - Tendencia de volumen anual',
+                    'num_pagos_std_6': 'Desviación estándar de pagos (6 meses) - Volatilidad de volumen',
+                    'num_pagos_diff_1': 'Cambio mensual en número de pagos - Momentum de volumen',
+                    'num_pagos_diff_12': 'Cambio anual en número de pagos - Momentum estacional de volumen',
+                    'año': 'Año actual - Factor de tendencia temporal',
+                    'mes': 'Mes actual - Factor estacional',
+                    'pct_judicial': 'Porcentaje de casos judiciales - Impacto de procesos legales',
+                    'pct_castigo': 'Porcentaje de casos con castigo - Impacto de medidas punitivas',
+                    'dias_mes': 'Número de días en el mes - Factor de oportunidad de recuperación'
+                }
+                
+                # Create display with descriptions
+                display_data = []
+                for _, row in top_features.iterrows():
+                    feature = row['Característica']
+                    importance = row['Importancia']
+                    description = feature_descriptions.get(feature, 'Característica derivada de datos históricos')
+                    display_data.append({
+                        'Característica': feature,
+                        'Importancia': f"{importance:.3f}",
+                        'Descripción': description
+                    })
+                
+                display_df = pd.DataFrame(display_data)
+                st.dataframe(display_df, hide_index=True)
+                
+                # Add explanation
+                st.caption("""Las características con mayor importancia tienen más influencia en las predicciones.
+                Los lags muestran valores históricos, las medias móviles muestran tendencias suavizadas,
+                y las diferencias muestran cambios momentáneos.""")
         
         # Progress indicator
         if len(monthly) > 1:
