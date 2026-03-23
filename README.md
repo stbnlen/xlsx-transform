@@ -1,19 +1,35 @@
 # Excel Transformer - Column Filter
 
-A Streamlit application that allows users to upload an Excel file, preview its contents, filter to specific columns based on the selected mode (Q_BANCO or Q_CMR), and download the filtered result.
+A Streamlit application that allows users to upload an Excel file, preview its contents, filter to specific columns based on the selected module, and download the filtered result.
 
 ## Features
 
-- Switch between two modes: Q_BANCO and Q_CMR
-- Visual indicator showing which mode is currently active
-- Disabled buttons for the currently active mode (cannot re-select same mode)
+- Navigate between modules using Streamlit's native page navigation
+- **Asignaciones module**: Contains Q_BANCO and Q_CMR filtering options
+- **Pagos module**: Contains PAGOS_FRM and PAGOS BCI filtering options
 - Upload Excel files (.xlsx, .xls)
 - Preview both original and filtered data in interactive tables
 - Automatic column filtering based on selected mode:
   - **Q_BANCO mode**: rut, dv, n_operacion, origen_core, nombre_completo_cliente, SUCURSAL, CARTERA, ESTADO CRM, ESTADO JUDICIAL, SALDO CAPITAL, % DESCUENTO, comuna_particular
   - **Q_CMR mode**: rut, n_operacion_principal, dv, nombre_completo_cliente, CARTERA, CATEGORIA, SUCURSAL, EJECUTIVA ASIGNADA, ESTADO JUDICIAL, DESCUENTO CAMPAÑA, SALDO_DEUDA, TRAMO, estado_cuenta
+  - **PAGOS_FRM mode**: Specific columns for financial processing (defined in pagos_frm.py)
+  - **PAGOS BCI mode**: Specific columns for BCI processing (defined in pagos_bci.py)
 - Download the filtered Excel file
 - Built with Streamlit, pandas, and openpyxl
+
+## Project Structure
+
+- `app.py` - Main Streamlit application (landing page)
+- `pages/asig.py` - Asignaciones module with Q_BANCO and Q_CMR tabs
+- `pages/pagos.py` - Pagos module with PAGOS_FRM and PAGOS BCI tabs
+- `q_banco.py` - Q_BANCO filtering logic
+- `q_cmr.py` - Q_CMR filtering logic
+- `pagos_frm.py` - PAGOS_FRM filtering logic
+- `pagos_bci.py` - PAGOS BCI filtering logic
+- `utils.py` - Utility functions for column normalization and validation
+- `requirements.txt` - Python dependencies
+- `AGENTS.md` - Guidelines for AI agents working on this project
+- `README.md` - This file
 
 ## Installation
 
@@ -35,10 +51,16 @@ streamlit run app.py
 
 The application will open in your default web browser (usually at http://localhost:8501).
 
-### Steps to use the app:
+### Navigation
 
-1. Observe the "Vista activa:" indicator showing which mode is currently selected
-2. Click either the Q_BANCO or Q_CMR button to switch modes (the currently active button will be disabled)
+Use the sidebar to navigate between:
+- **Asignaciones**: Contains Q_BANCO and Q_CMR modules
+- **Pagos**: Contains PAGOS_FRM and PAGOS BCI modules
+
+### Steps to use each module:
+
+1. Select the desired module from the sidebar navigation
+2. Within each module, use the tabs to select the specific view (e.g., Q_BANCO or Q_CMR in Asignaciones module)
 3. Click "Browse files" or drag and drop an Excel file (.xlsx or .xls) into the upload area
 4. Once uploaded, you'll see:
    - A preview of the original data with its dimensions
@@ -46,25 +68,28 @@ The application will open in your default web browser (usually at http://localho
    - A "Download Filtered Excel" button to download the result
 5. If required columns are missing, the app will show an error with the list of available columns
 
-## Modes Explained
+## Modules Explained
 
-### Q_BANCO Mode
+### Asignaciones Module
+
+#### Q_BANCO Tab
 Filters to keep these specific columns:
 - rut, dv, n_operacion (from n_operacion_principal), origen_core, nombre_completo_cliente, 
 - SUCURSAL, CARTERA, ESTADO CRM, ESTADO JUDICIAL, SALDO CAPITAL (from saldo_capital), 
 - % DESCUENTO, comuna_particular
 
-### Q_CMR Mode  
+#### Q_CMR Tab  
 Filters to keep these specific columns:
 - rut, n_operacion_principal, dv, nombre_completo_cliente, CARTERA, CATEGORIA, 
 - SUCURSAL, EJECUTIVA ASIGNADA, ESTADO JUDICIAL, DESCUENTO CAMPAÑA, SALDO_DEUDA, TRAMO, estado_cuenta
 
-## Project Structure
+### Pagos Module
 
-- `app.py` - Main Streamlit application with dual mode functionality
-- `requirements.txt` - Python dependencies
-- `AGENTS.md` - Guidelines for AI agents working on this project
-- `README.md` - This file
+#### PAGOS_FRM Tab
+Specific column filtering for financial processing (see pagos_frm.py for exact column list)
+
+#### PAGOS BCI Tab
+Specific column filtering for BCI processing (see pagos_bci.py for exact column list)
 
 ## Dependencies
 
@@ -76,13 +101,13 @@ Filters to keep these specific columns:
 
 The application follows these steps:
 
-1. User selects a mode (Q_BANCO or Q_CMR) via buttons
-2. The active mode is displayed and the corresponding button is disabled
+1. User selects a module (Asignaciones or Pagos) via the sidebar navigation
+2. Within the selected module, user chooses a specific view via tabs
 3. User uploads an Excel file via `st.file_uploader`
 4. The file is read into a pandas DataFrame using `pd.read_excel`
 5. The original DataFrame is displayed using `st.dataframe`
-6. The application checks for required columns based on the selected mode and shows an error if any are missing
-7. If all columns are present, it filters the DataFrame to keep only the mode-specific columns
+6. The application checks for required columns based on the selected view and shows an error if any are missing
+7. If all columns are present, it filters the DataFrame to keep only the view-specific columns
 8. For Q_BANCO mode, specific columns are renamed:
    - 'n_operacion_principal' → 'n_operacion'
    - 'saldo_capital' → 'SALDO CAPITAL'
@@ -92,18 +117,18 @@ The application follows these steps:
 
 ## Notes
 
-- The app validates that all required columns exist in the uploaded file before processing for the selected mode
+- The app validates that all required columns exist in the uploaded file before processing for the selected view
 - Column name transformations are applied only in Q_BANCO mode to match the exact output format requested
 - The app uses in-memory operations, so no temporary files are saved to disk
-- Button states are managed using Streamlit's session state to prevent re-selecting the active mode
 
 ## Development
 
 To modify the application:
 
-1. Edit `app.py` to change the filtering logic, column selection, or mode definitions
-2. Test changes locally with `streamlit run app.py`
-3. Ensure dependencies are up to date in `requirements.txt`
+1. Edit the respective view files (`q_banco.py`, `q_cmr.py`, `pagos_frm.py`, `pagos_bci.py`) to change the filtering logic, column selection, or mode definitions
+2. For structural changes, modify the page files in the `pages/` directory
+3. Test changes locally with `streamlit run app.py`
+4. Ensure dependencies are up to date in `requirements.txt`
 
 ## License
 

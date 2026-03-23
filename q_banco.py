@@ -35,18 +35,21 @@ def show_q_banco_view():
             actual_columns_to_use = [column_mapping[col] for col in columns_to_keep]
             filtered_df = df[actual_columns_to_use].copy()
             
-            filtered_df = filtered_df.rename(columns={
-                'n_operacion_principal': 'n_operacion',
-                'saldo_capital': 'SALDO CAPITAL'
-            })
+            # Rename specific columns for Q_BANCO output format
+            filtered_df = filtered_df.rename(
+                columns={'n_operacion_principal': 'n_operacion', 'saldo_capital': 'SALDO CAPITAL'}
+            )
             
             st.subheader("Filtered Data Preview:")
             st.dataframe(filtered_df)
             st.write(f"Filtered shape: {filtered_df.shape}")
             
-            output = io.BytesIO()
+            # Create Excel file in memory - using BytesIO with ExcelWriter is standard practice
+            output: io.BytesIO = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 filtered_df.to_excel(writer, index=False)
+            # Reset buffer position for reading
+            output.seek(0)
             
             st.download_button(
                 label="Download Filtered Excel",
