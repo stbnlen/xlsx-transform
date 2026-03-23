@@ -1,27 +1,19 @@
 import streamlit as st
 
-# Import view functions from separate files
-from q_banco import show_q_banco_view
-from q_cmr import show_q_cmr_view
-from pagos_frm import show_pagos_frm_view
-from pagos_bci import show_pagos_bci_view
+# Set page configuration
+st.set_page_config(
+    page_title="Excel Transformer",
+    page_icon="📊",
+    layout="wide"
+)
 
+# Main title and description
+st.title("Excel Transformer")
+st.markdown("### Select a module from the sidebar navigation")
 
-# Main app with tabs
-tab1, tab2, tab3, tab4 = st.tabs(["Q_BANCO", "Q_CMR", "PAGOS_FRM", "PAGOS BCI"])
-
-with tab1:
-    st.header("Q_BANCO View")
-    show_q_banco_view()
-
-with tab2:
-    st.header("Q_CMR View")
-    show_q_cmr_view()
-
-with tab3:
-    st.header("PAGOS_FRM View")
-    show_pagos_frm_view()
-
-with tab4:
-    st.header("PAGOS BCI")
-    show_pagos_bci_view()
+# Optional: Add some information about the app
+st.info("""
+Use the sidebar navigation to access different modules:
+- **Asignaciones**: Contains Q_BANCO and Q_CMR modules
+- **Pagos**: Contains PAGOS_FRM and PAGOS BCI modules
+""")
