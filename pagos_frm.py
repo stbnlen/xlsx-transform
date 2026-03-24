@@ -759,174 +759,180 @@ def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.Da
                     f"{historical_avg_payments:,.0f}"
                 )
         
-        # Create visualization
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        # Create visualization - Separate charts for amount and payments for clarity
+        fig = plt.figure(figsize=(16, 12))
         
-        # 1. Bar chart: Current vs Historical Average (with dual Y-axis for different scales)
-        ax1 = axes[0, 0]
-        categories = ['Monto Total', 'Número de Pagos']
-        current_values = [current_amount, current_payments]
-        historical_values = [historical_avg_amount, historical_avg_payments]
+        # Create a grid: 3 rows, 2 columns
+        # Row 0: Comparison charts (Actual vs Historical Average)
+        # Row 1: Trend charts (Historical Evolution)
+        # Row 2: Waterfall and Distribution charts
         
-        x = np.arange(len(categories))
-        width = 0.35
-        
-        # Plot monetary values (left Y-axis)
-        bars1_monto = ax1.bar(x[0] - width/2, current_values[0], width, label='Monto Actual', color='skyblue', alpha=0.8)
-        bars2_monto = ax1.bar(x[0] + width/2, historical_values[0], width, label='Monto Histórico', color='lightcoral', alpha=0.8)
-        
-        # Create second Y-axis for payment counts
-        ax1_twin = ax1.twinx()
-        
-        # Plot payment counts (right Y-axis)
-        bars1_pagos = ax1_twin.bar(x[1] - width/2, current_values[1], width, label='Pagos Actual', color='green', alpha=0.8)
-        bars2_pagos = ax1_twin.bar(x[1] + width/2, historical_values[1], width, label='Pagos Histórico', color='orange', alpha=0.8)
-        
-        # Configure axes
-        ax1.set_xlabel('Tipo de Métrica')
-        ax1.set_ylabel('Monto Total ($)', color='skyblue')
-        ax1_twin.set_ylabel('Número de Pagos', color='green')
-        ax1.tick_params(axis='y', labelcolor='skyblue')
-        ax1_twin.tick_params(axis='y', labelcolor='green')
-        
-        # Set x-axis labels
-        ax1.set_xticks(x)
-        ax1.set_xticklabels(categories)
-        
-        # Create combined legend
-        bars1 = [bars1_monto[0], bars1_pagos[0]]
-        bars2 = [bars2_monto[0], bars2_pagos[0]]
-        ax1.legend(bars1, ['Monto Actual', 'Pagos Actual'], loc='upper left')
-        ax1_twin.legend(bars2, ['Monto Histórico', 'Pagos Histórico'], loc='upper right')
-        
-        ax1.set_title('Comparación: Actual vs Promedio Histórico', fontweight='bold')
+        # 1. Comparison: Actual vs Historical Average - Amount (top left)
+        ax1 = plt.subplot(3, 2, 1)
+        comparison_data = [current_amount, historical_avg_amount]
+        comparison_labels = ['Actual', 'Promedio Histórico']
+        bars1 = ax1.bar(comparison_labels, comparison_data, color=['skyblue', 'lightcoral'], alpha=0.8, edgecolor='black')
+        ax1.set_ylabel('Monto Total ($)', fontsize=12)
+        ax1.set_title('Monto Total: Actual vs Promedio Histórico', fontweight='bold', fontsize=14)
+        ax1.grid(True, alpha=0.3, axis='y')
         
         # Add value labels on bars
-        def autolabel_monto(bars):
-            for bar in bars:
-                height = bar.get_height()
-                ax1.annotate(f'${height:,.0f}',
-                            xy=(bar.get_x() + bar.get_width() / 2, height),
-                            xytext=(0, 3),  # 3 points vertical offset
-                            textcoords="offset points",
-                            ha='center', va='bottom', fontsize=9, color='black')
+        for bar, value in zip(bars1, comparison_data):
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01*max(comparison_data),
+                    f'${value:,.0f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
         
-        def autolabel_pagos(bars):
-            for bar in bars:
-                height = bar.get_height()
-                ax1_twin.annotate(f'{height:,.0f}',
-                                 xy=(bar.get_x() + bar.get_width() / 2, height),
-                                 xytext=(0, 3),  # 3 points vertical offset
-                                 textcoords="offset points",
-                                 ha='center', va='bottom', fontsize=9, color='black')
+        # 2. Comparison: Actual vs Historical Average - Payments (top right)
+        ax2 = plt.subplot(3, 2, 2)
+        comparison_data_p = [current_payments, historical_avg_payments]
+        bars2 = ax2.bar(comparison_labels, comparison_data_p, color=['lightgreen', 'orange'], alpha=0.8, edgecolor='black')
+        ax2.set_ylabel('Número de Pagos', fontsize=12)
+        ax2.set_title('Número de Pagos: Actual vs Promedio Histórico', fontweight='bold', fontsize=14)
+        ax2.grid(True, alpha=0.3, axis='y')
         
-        autolabel_monto(bars1_monto)
-        autolabel_monto(bars2_monto)
-        autolabel_pagos(bars1_pagos)
-        autolabel_pagos(bars2_pagos)
+        # Add value labels on bars
+        for bar, value in zip(bars2, comparison_data_p):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01*max(comparison_data_p),
+                    f'{value:,.0f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
         
-        # 2. Line chart: Historical trend for same month up to day
-        ax2 = axes[0, 1]
+        # 3. Historical Trend - Amount (middle left)
+        ax3 = plt.subplot(3, 2, 3)
         if len(historical_yearly) > 0:
             # Sort by year for proper line chart
             historical_yearly_sorted = historical_yearly.sort_values('AÑO')
             años = historical_yearly_sorted['AÑO'].tolist()
             montos = historical_yearly_sorted['monto_total'].tolist()
-            pagos = historical_yearly_sorted['num_pagos'].tolist()
             
-            ax2_twin = ax2.twinx()
+            ax3.plot(años, montos, 'b-o', linewidth=2.5, markersize=6, label='Monto Total')
+            ax3.set_xlabel('Año', fontsize=12)
+            ax3.set_ylabel('Monto Total ($)', fontsize=12, color='b')
+            ax3.tick_params(axis='y', labelcolor='b')
+            ax3.set_title(f'Tendencia Histórica del Monto - Mes {current_month_num}', fontweight='bold', fontsize=14)
+            ax3.set_xticks(años)
+            ax3.tick_params(axis='x', rotation=45)
+            ax3.grid(True, alpha=0.3)
             
-            line1 = ax2.plot(años, montos, 'b-o', label='Monto Total', linewidth=2, markersize=4)
-            line2 = ax2_twin.plot(años, pagos, 'r-s', label='Número de Pagos', linewidth=2, markersize=4)
-            
-            # Highlight current year if it exists in historical data (shouldn't, but just in case)
+            # Highlight current year point if it exists in historical data
             current_in_historical = historical_yearly[historical_yearly['AÑO'] == current_year]
             if len(current_in_historical) > 0:
-                ax2.plot(current_year, current_in_historical.iloc[0]['monto_total'], 'b*', markersize=12, label='Actual')
-                ax2_twin.plot(current_year, current_in_historical.iloc[0]['num_pagos'], 'r*', markersize=12, label='Actual')
+                ax3.plot(current_year, current_in_historical.iloc[0]['monto_total'], 'b*', markersize=15, label='Actual')
             
-            ax2.set_xlabel('Año')
-            ax2.set_ylabel('Monto Total ($)', color='b')
-            ax2_twin.set_ylabel('Número de Pagos', color='r')
-            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num} (hasta día {current_day_of_month})', fontweight='bold')
-            
-            # Combine legends
-            lines1, labels1 = ax2.get_legend_handles_labels()
-            lines2, labels2 = ax2_twin.get_legend_handles_labels()
-            ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
-            
-            ax2.grid(True, alpha=0.3)
+            ax3.legend(loc='best')
         else:
-            ax2.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar tendencia', 
-                    ha='center', va='center', transform=ax2.transAxes)
-            ax2.set_title(f'Tendencia Histórica: Mes {current_month_num} (hasta día {current_day_of_month})', fontweight='bold')
+            ax3.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar tendencia', 
+                    ha='center', va='center', transform=ax3.transAxes, fontsize=12)
+            ax3.set_title(f'Tendencia Histórica del Monto - Mes {current_month_num}', fontweight='bold', fontsize=14)
         
-        # 3. Waterfall chart showing contributions to change from historical average
-        ax3 = axes[1, 0]
+        # 4. Historical Trend - Payments (middle right)
+        ax4 = plt.subplot(3, 2, 4)
+        if len(historical_yearly) > 0:
+            # Sort by year for proper line chart
+            historical_yearly_sorted = historical_yearly.sort_values('AÑO')
+            años = historical_yearly_sorted['AÑO'].tolist()
+            pagos = historical_yearly_sorted['num_pagos'].tolist()
+            
+            ax4.plot(años, pagos, 'r-s', linewidth=2.5, markersize=6, label='Número de Pagos')
+            ax4.set_xlabel('Año', fontsize=12)
+            ax4.set_ylabel('Número de Pagos', fontsize=12, color='r')
+            ax4.tick_params(axis='y', labelcolor='r')
+            ax4.set_title(f'Tendencia Histórica de Pagos - Mes {current_month_num}', fontweight='bold', fontsize=14)
+            ax4.set_xticks(años)
+            ax4.tick_params(axis='x', rotation=45)
+            ax4.grid(True, alpha=0.3)
+            
+            # Highlight current year point if it exists in historical data
+            current_in_historical = historical_yearly[historical_yearly['AÑO'] == current_year]
+            if len(current_in_historical) > 0:
+                ax4.plot(current_year, current_in_historical.iloc[0]['num_pagos'], 'r*', markersize=15, label='Actual')
+            
+            ax4.legend(loc='best')
+        else:
+            ax4.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar tendencia', 
+                    ha='center', va='center', transform=ax4.transAxes, fontsize=12)
+            ax4.set_title(f'Tendencia Histórica de Pagos - Mes {current_month_num}', fontweight='bold', fontsize=14)
+        
+        # 5. Waterfall Chart - Amount Changes (bottom left)
+        ax5 = plt.subplot(3, 2, 5)
         change_amount = current_amount - historical_avg_amount
-        change_payments = current_payments - historical_avg_payments
         
-        # Data for waterfall
-        categories_waterfall = ['Promedio Histórico', 'Cambio Monto', 'Cambio Pagos', 'Valor Actual']
-        values_waterfall = [historical_avg_amount, change_amount, change_payments, current_amount]
+        # Data for waterfall (Amount)
+        categories_waterfall_a = ['Promedio Histórico', 'Cambio', 'Valor Actual']
+        values_waterfall_a = [historical_avg_amount, change_amount, current_amount]
         
         # Calculate cumulative positions for waterfall
-        cumulative = [0]
-        for i in range(len(values_waterfall)-1):
-            cumulative.append(cumulative[-1] + values_waterfall[i])
+        cumulative_a = [0]
+        for i in range(len(values_waterfall_a)-1):
+            cumulative_a.append(cumulative_a[-1] + values_waterfall_a[i])
         
-        # Colors: positive = green, negative = red
-        colors_waterfall = ['gray']  # Starting point
-        for i in range(1, len(values_waterfall)-1):
-            colors_waterfall.append('green' if values_waterfall[i] >= 0 else 'red')
-        colors_waterfall.append('blue')  # End point
+        # Colors: negative = red, positive = green
+        colors_waterfall_a = ['gray']  # Starting point
+        for i in range(1, len(values_waterfall_a)-1):
+            colors_waterfall_a.append('green' if values_waterfall_a[i] >= 0 else 'red')
+        colors_waterfall_a.append('blue')  # End point
         
-        bars3 = ax3.bar(range(len(categories_waterfall)), values_waterfall, 
-                       color=colors_waterfall, alpha=0.7, edgecolor='black')
+        bars5 = ax5.bar(range(len(categories_waterfall_a)), values_waterfall_a, 
+                       color=colors_waterfall_a, alpha=0.8, edgecolor='black')
         
         # Add connector lines for waterfall effect
-        for i in range(1, len(bars3)-1):
-            ax3.plot([i-1+0.4, i-1+0.6], [cumulative[i], cumulative[i]], 'k--', alpha=0.5)
-            ax3.plot([i-0.4, i-0.4], [cumulative[i], cumulative[i+1]], 'k--', alpha=0.5)
+        for i in range(1, len(bars5)-1):
+            ax5.plot([i-1+0.4, i-1+0.6], [cumulative_a[i], cumulative_a[i]], 'k--', alpha=0.5)
+            ax5.plot([i-0.4, i-0.4], [cumulative_a[i], cumulative_a[i+1]], 'k--', alpha=0.5)
         
-        ax3.set_title('Desglose de Cambios respecto al Promedio Histórico', fontweight='bold')
-        ax3.set_ylabel('Valor')
-        ax3.set_xticks(range(len(categories_waterfall)))
-        ax3.set_xticklabels(categories_waterfall, rotation=15)
+        ax5.set_ylabel('Monto Total ($)', fontsize=12)
+        ax5.set_title('Desglose de Cambios en Monto Total', fontweight='bold', fontsize=14)
+        ax5.set_xticks(range(len(categories_waterfall_a)))
+        ax5.set_xticklabels(categories_waterfall_a, rotation=15)
         
         # Add value labels on bars
-        for i, (bar, value) in enumerate(zip(bars3, values_waterfall)):
+        for i, (bar, value) in enumerate(zip(bars5, values_waterfall_a)):
             height = bar.get_height()
-            ax3.text(bar.get_x() + bar.get_width()/2, 
+            ax5.text(bar.get_x() + bar.get_width()/2., 
+                    height + (0.01 * abs(height) if height >= 0 else -0.01 * abs(height)),
+                    f'${value:,.0f}', ha='center', 
+                    va='bottom' if height >= 0 else 'top', fontsize=10, fontweight='bold')
+        
+        # 6. Waterfall Chart - Payment Changes (bottom right)
+        ax6 = plt.subplot(3, 2, 6)
+        change_payments = current_payments - historical_avg_payments
+        
+        # Data for waterfall (Payments)
+        categories_waterfall_p = ['Promedio Histórico', 'Cambio', 'Valor Actual']
+        values_waterfall_p = [historical_avg_payments, change_payments, current_payments]
+        
+        # Calculate cumulative positions for waterfall
+        cumulative_p = [0]
+        for i in range(len(values_waterfall_p)-1):
+            cumulative_p.append(cumulative_p[-1] + values_waterfall_p[i])
+        
+        # Colors: negative = red, positive = green
+        colors_waterfall_p = ['gray']  # Starting point
+        for i in range(1, len(values_waterfall_p)-1):
+            colors_waterfall_p.append('green' if values_waterfall_p[i] >= 0 else 'red')
+        colors_waterfall_p.append('blue')  # End point
+        
+        bars6 = ax6.bar(range(len(categories_waterfall_p)), values_waterfall_p, 
+                       color=colors_waterfall_p, alpha=0.8, edgecolor='black')
+        
+        # Add connector lines for waterfall effect
+        for i in range(1, len(bars6)-1):
+            ax6.plot([i-1+0.4, i-1+0.6], [cumulative_p[i], cumulative_p[i]], 'k--', alpha=0.5)
+            ax6.plot([i-0.4, i-0.4], [cumulative_p[i], cumulative_p[i+1]], 'k--', alpha=0.5)
+        
+        ax6.set_ylabel('Número de Pagos', fontsize=12)
+        ax6.set_title('Desglose de Cambios en Número de Pagos', fontweight='bold', fontsize=14)
+        ax6.set_xticks(range(len(categories_waterfall_p)))
+        ax6.set_xticklabels(categories_waterfall_p, rotation=15)
+        
+        # Add value labels on bars
+        for i, (bar, value) in enumerate(zip(bars6, values_waterfall_p)):
+            height = bar.get_height()
+            ax6.text(bar.get_x() + bar.get_width()/2., 
                     height + (0.01 * abs(height) if height >= 0 else -0.01 * abs(height)),
                     f'{value:,.0f}', ha='center', 
-                    va='bottom' if height >= 0 else 'top', fontsize=9)
+                    va='bottom' if height >= 0 else 'top', fontsize=10, fontweight='bold')
         
-        # 4. Box plot showing distribution of historical data for same month up to day
-        ax4 = axes[1, 1]
-        if len(historical_yearly) > 0:
-            box_data = [historical_yearly['monto_total'].values, historical_yearly['num_pagos'].values]
-            box_plot = ax4.boxplot(box_data, labels=['Monto Total', 'Número de Pagos'], patch_artist=True)
-            
-            # Color the boxes
-            colors = ['lightblue', 'lightgreen']
-            for patch, color in zip(box_plot['boxes'], colors):
-                patch.set_facecolor(color)
-            
-            # Add current value as a point
-            ax4.scatter([1], [current_amount], color='red', s=100, zorder=5, label='Actual (Monto)')
-            ax4.scatter([2], [current_payments], color='red', s=100, zorder=5, label='Actual (Pagos)')
-            
-            ax4.set_title('Distribución Histórica (hasta día)', fontweight='bold')
-            ax4.set_ylabel('Valor')
-            ax4.legend()
-            ax4.grid(True, alpha=0.3)
-        else:
-            ax4.text(0.5, 0.5, 'No hay datos históricos suficientes\npara mostrar distribución', 
-                    ha='center', va='center', transform=ax4.transAxes)
-            ax4.set_title('Distribución Histórica (hasta día)', fontweight='bold')
-        
-        plt.tight_layout()
+        plt.tight_layout(pad=3.0)
         st.pyplot(fig)
         
         # Show historical data table for reference
