@@ -97,30 +97,31 @@ def show_pagos_frm_view():
         if 'AÑO_MES' in df_clean.columns and date_columns:
             st.write("---")
             st.subheader("📊 Monthly Aggregation Analysis")
-             
+              
             amount_col = find_amount_column(df_clean)
-             
+                
             if 'AÑO' in df_clean.columns and 'MES_NUM' in df_clean.columns and 'MONTO' in df_clean.columns:
-                try:
-                    monthly = aggregate_monthly(df_clean, 'MONTO')
-                       
-                    if monthly is not None and len(monthly) > 0:
-                        _show_monthly_metrics(monthly)
-                        _show_descriptive_stats(monthly)
-                        _show_eda_charts(monthly, df_clean, amount_col)
-                        _show_seasonal_analysis(monthly)
-                        _show_trend_analysis(monthly)
-                        _show_patterns_analysis(monthly)
-                        _show_correlation_analysis(monthly)
-                        _show_analisis_mensual_comparativo(monthly, df_clean)
-                        _show_prediction_analysis(monthly, df_clean)
-                    elif monthly is not None:
-                        st.warning("⚠️ No historical data available for detailed analysis")
-                    else:
-                        st.warning("⚠️ No valid data found after cleaning")
-                except Exception as e:
-                    st.error(f"Error in monthly aggregation: {e}")
-                    _show_basic_stats_fallback(df_clean, amount_col)
+                 try:
+                     monthly = aggregate_monthly(df_clean, 'MONTO')
+                        
+                     if monthly is not None and len(monthly) > 0:
+                         _show_monthly_metrics(monthly)
+                         _show_descriptive_stats(monthly)
+                         _show_eda_charts(monthly, df_clean, amount_col)
+                         _show_seasonal_analysis(monthly)
+                         _show_trend_analysis(monthly)
+                         _show_patterns_analysis(monthly)
+                         _show_correlation_analysis(monthly)
+                         _show_analisis_por_ejecutiva(df_clean, monthly)
+                         _show_analisis_mensual_comparativo(monthly, df_clean)
+                         _show_prediction_analysis(monthly, df_clean)
+                     elif monthly is not None:
+                         st.warning("⚠️ No historical data available for detailed analysis")
+                     else:
+                         st.warning("⚠️ No valid data found after cleaning")
+                 except Exception as e:
+                     st.error(f"Error in monthly aggregation: {e}")
+                     _show_basic_stats_fallback(df_clean, amount_col)
             else:
                 st.warning("⚠️ Not enough valid data for monthly aggregation")
         else:
@@ -524,8 +525,11 @@ def _show_correlation_analysis(monthly: pd.DataFrame):
         st.info("ℹ️ No hay suficientes columnas numéricas para análisis de correlaciones")
         return
     
-    if 'monto_total' not in monthly.columns:
-        st.warning("⚠️ La columna 'monto_total' no está disponible para correlación")
+    # Find the amount column in monthly data (should be 'monto_total' after aggregation)
+    amount_col_monthly = 'monto_total'  # This is the standard name used in aggregate_monthly
+    
+    if amount_col_monthly not in monthly.columns:
+        st.warning(f"⚠️ La columna '{amount_col_monthly}' no está disponible para correlación")
         return
     
     # Create correlation heatmap
@@ -543,17 +547,17 @@ def _show_correlation_analysis(monthly: pd.DataFrame):
             import numpy as np
             
             # Prepare data for correlation testing
-            numeric_cols = [col for col in monthly.columns if col != 'monto_total' and 
-                           pd.api.types.is_numeric_dtype(monthly[col])]
+            numeric_cols = [col for col in monthly.columns if col != amount_col_monthly and 
+                            pd.api.types.is_numeric_dtype(monthly[col])]
             
             if len(numeric_cols) > 0 and len(monthly) > 2:
                 # Calculate correlations with p-values
                 corr_details = []
                 for col in numeric_cols:
                     # Remove NaN values for correlation calculation
-                    valid_data = monthly[['monto_total', col]].dropna()
+                    valid_data = monthly[[amount_col_monthly, col]].dropna()
                     if len(valid_data) > 2:
-                        corr_val, p_val = scipy_stats.pearsonr(valid_data['monto_total'], valid_data[col])
+                        corr_val, p_val = scipy_stats.pearsonr(valid_data[amount_col_monthly], valid_data[col])
                         corr_details.append({
                             'Variable': col,
                             'Correlación': f"{corr_val:.3f}",
@@ -575,8 +579,202 @@ def _show_correlation_analysis(monthly: pd.DataFrame):
         st.warning("⚠️ No se pudieron calcular correlaciones")
 
 
-
-
+def _show_analisis_por_ejecutiva(df_original: pd.DataFrame, monthly: pd.DataFrame):
+    """Display analysis by ejecutiva."""
+    st.write("---")
+    st.subheader("👥 Análisis por Ejecutiva")
+    
+    if 'EJECUTIVA' not in df_original.columns:
+        st.info("ℹ️ Para análisis por ejecutiva, asegúrese de que el archivo tenga una columna 'EJECUTIVA'")
+        return
+        
+    try:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        # Get current month from monthly data (last row is the current/incomplete month)
+        if len(monthly) == 0:
+            st.warning("⚠️ No hay datos mensuales disponibles")
+            return
+            
+        current_period = monthly.iloc[-1]['AÑO_MES']
+        
+        # Extract year and month from the period
+        try:
+            current_year = int(str(current_period)[:4])
+            current_month_num = int(str(current_period)[5:7])
+        except (ValueError, IndexError):
+            # Fallback: try to get from año and mes columns if they exist
+            if 'año' in monthly.columns and 'mes' in monthly.columns:
+                current_year = int(monthly.iloc[-1]['año'])
+                current_month_num = int(monthly.iloc[-1]['mes'])
+            else:
+                st.error("⚠️ No se pudo extraer el año y mes de los datos")
+                return
+        
+        # Get the current day of month from the original data for the current year and month
+        current_day_data = df_original[
+            (df_original['AÑO'] == current_year) & 
+            (df_original['MES_NUM'] == current_month_num)
+        ]
+        if len(current_day_data) > 0:
+            current_day_of_month = int(current_day_data['DIA'].max())
+        else:
+            # If no data for current year/month, fallback to using the month length
+            current_day_of_month = monthly.iloc[-1]['dias_mes'] if 'dias_mes' in monthly.columns else 30
+        
+        st.write(f"**Comparando hasta el día {current_day_of_month} del mes {current_month_num}**")
+        
+        # Filter current month data (up to current day)
+        current_month_data = df_original[
+            (df_original['AÑO'] == current_year) & 
+            (df_original['MES_NUM'] == current_month_num) &
+            (df_original['DIA'] <= current_day_of_month)
+        ]
+        
+        # Filter historical data (same month/day, previous years)
+        historical_data = df_original[
+            (df_original['MES_NUM'] == current_month_num) &
+            (df_original['DIA'] <= current_day_of_month) &
+            (df_original['AÑO'] < current_year)
+        ]
+        
+        if len(current_month_data) == 0 and len(historical_data) == 0:
+            st.warning("⚠️ No hay datos disponibles para el análisis.")
+            return
+            
+        if len(current_month_data) > 0:
+            # Aggregate by ejecutiva for current month
+            ejecutivo_current = current_month_data.groupby('EJECUTIVA').agg(
+                monto_total=('MONTO', 'sum'),
+                num_pagos=('MONTO', 'count')
+            ).reset_index()
+            
+            # Sort by monto_total descending
+            ejecutivo_current = ejecutivo_current.sort_values('monto_total', ascending=False)
+        else:
+            ejecutivo_current = pd.DataFrame(columns=['EJECUTIVA', 'monto_total', 'num_pagos'])
+            
+        if len(historical_data) > 0:
+            # Aggregate by ejecutiva for historical data
+            ejecutivo_historical = historical_data.groupby(['AÑO', 'EJECUTIVA']).agg(
+                monto_total=('MONTO', 'sum'),
+                num_pagos=('MONTO', 'count')
+            ).reset_index()
+            
+            # Calculate historical average by ejecutiva
+            ejecutivo_historical_avg = ejecutivo_historical.groupby('EJECUTIVA').agg(
+                monto_total=('monto_total', 'mean'),
+                num_pagos=('num_pagos', 'mean')
+            ).reset_index()
+            
+            # Sort by monto_total descending
+            ejecutivo_historical_avg = ejecutivo_historical_avg.sort_values('monto_total', ascending=False)
+        else:
+            ejecutivo_historical_avg = pd.DataFrame(columns=['EJECUTIVA', 'monto_total', 'num_pagos'])
+        
+        # Display metrics for top ejecutivas
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Top 5 Ejecutivas - Mes Actual (Monto)**")
+            if len(ejecutivo_current) > 0:
+                top_5_current = ejecutivo_current.head(5)[['EJECUTIVA', 'monto_total', 'num_pagos']]
+                top_5_current['monto_total'] = top_5_current['monto_total'].apply(lambda x: f"${x:,.0f}")
+                st.dataframe(top_5_current, hide_index=True)
+            else:
+                st.write("No hay datos para el mes actual")
+        
+        with col2:
+            st.write("**Top 5 Ejecutivas - Promedio Histórico (Monto)**")
+            if len(ejecutivo_historical_avg) > 0:
+                top_5_historical = ejecutivo_historical_avg.head(5)[['EJECUTIVA', 'monto_total', 'num_pagos']]
+                top_5_historical['monto_total'] = top_5_historical['monto_total'].apply(lambda x: f"${x:,.0f}")
+                st.dataframe(top_5_historical, hide_index=True)
+            else:
+                st.write("No hay datos históricos")
+        
+        # Calculate growth for each ejecutiva present in both periods
+        if len(ejecutivo_current) > 0 and len(ejecutivo_historical_avg) > 0:
+            ejecutivo_merged = pd.merge(
+                ejecutivo_current[['EJECUTIVA', 'monto_total']],
+                ejecutivo_historical_avg[['EJECUTIVA', 'monto_total']],
+                on='EJECUTIVA',
+                suffixes=('_actual', '_historico')
+            )
+            
+            if len(ejecutivo_merged) > 0:
+                ejecutivo_merged['crecimiento_pct'] = (
+                    (ejecutivo_merged['monto_total_actual'] - ejecutivo_merged['monto_total_historico']) / 
+                    ejecutivo_merged['monto_total_historico'] * 100
+                )
+                
+                # Show growth leaders
+                st.write("**Crecimiento por Ejecutiva (vs Promedio Histórico)**")
+                growth_data = ejecutivo_merged[['EJECUTIVA', 'monto_total_actual', 'monto_total_historico', 'crecimiento_pct']].copy()
+                growth_data['monto_total_actual'] = growth_data['monto_total_actual'].apply(lambda x: f"${x:,.0f}")
+                growth_data['monto_total_historico'] = growth_data['monto_total_historico'].apply(lambda x: f"${x:,.0f}")
+                growth_data['crecimiento_pct'] = growth_data['crecimiento_pct'].apply(lambda x: f"{x:+.1f}%")
+                st.dataframe(growth_data.sort_values('crecimiento_pct', ascending=False), hide_index=True)
+            else:
+                st.info("ℹ️ No hay ejecutivas comunes entre el período actual y histórico para comparar crecimiento.")
+        else:
+            if len(ejecutivo_current) == 0:
+                st.warning("⚠️ No hay datos para el mes actual hasta el día de hoy.")
+            if len(ejecutivo_historical_avg) == 0:
+                st.warning("⚠️ No hay datos históricos para el mismo período en años anteriores.")
+                
+        # Create visualization for ejecutivo comparison
+        if len(ejecutivo_current) > 0 and len(ejecutivo_historical_avg) > 0:
+            st.write("---")
+            st.subheader("📊 Comparación Visual por Ejecutiva")
+            
+            # Prepare data for bar chart - get all unique ejecutivas from both periods
+            ejecutivos_all = set(ejecutivo_current['EJECUTIVA'].tolist() + ejecutivo_historical_avg['EJECUTIVA'].tolist())
+            ejecutivos_all = list(ejecutivos_all)
+            
+            # Prepare data for bar chart
+            comparison_data = pd.DataFrame({
+                'Ejecutivo': ejecutivos_all,
+                'Mes Actual': [ejecutivo_current.set_index('EJECUTIVA').loc[ej, 'monto_total'] if ej in ejecutivo_current['EJECUTIVA'].values else 0 for ej in ejecutivos_all],
+                'Promedio Histórico': [ejecutivo_historical_avg.set_index('EJECUTIVA').loc[ej, 'monto_total'] if ej in ejecutivo_historical_avg['EJECUTIVA'].values else 0 for ej in ejecutivos_all]
+            })
+            
+            # Sort by current month values descending
+            comparison_data = comparison_data.sort_values('Mes Actual', ascending=False)
+            
+            # Create bar chart
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            x = np.arange(len(comparison_data))
+            width = 0.35
+            
+            bars1 = ax.bar(x - width/2, comparison_data['Mes Actual'], width, label='Mes Actual', color='skyblue', edgecolor='navy')
+            bars2 = ax.bar(x + width/2, comparison_data['Promedio Histórico'], width, label='Promedio Histórico', color='lightcoral', edgecolor='darkred')
+            
+            ax.set_xlabel('Ejecutiva', fontsize=12)
+            ax.set_ylabel('Monto Total ($)', fontsize=12)
+            ax.set_title('Comparación de Pagos por Ejecutiva: Mes Actual vs Promedio Histórico', fontsize=14, fontweight='bold')
+            ax.set_xticks(x)
+            ax.set_xticklabels(comparison_data['Ejecutivo'], rotation=45, ha='right')
+            ax.legend()
+            ax.grid(True, alpha=0.3, axis='y')
+            
+            # Add value labels on bars
+            def add_value_labels(bars):
+                for bar in bars:
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width()/2., height,
+                           f'${height:,.0f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            
+            add_value_labels(bars1)
+            add_value_labels(bars2)
+            
+            plt.tight_layout()
+            st.pyplot(fig)
+            
+    except Exception as e:
+        st.error(f"Error en el análisis por ejecutiva: {e}")
+        st.info("ℹ️ Verifique que los datos tengan el formato correcto")
 
 
 def _show_analisis_mensual_comparativo(monthly: pd.DataFrame, df_original: pd.DataFrame):
