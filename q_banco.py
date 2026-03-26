@@ -37,7 +37,7 @@ def show_q_banco_view():
             
             # Rename specific columns for Q_BANCO output format
             filtered_df = filtered_df.rename(
-                columns={'n_operacion_principal': 'n_operacion', 'saldo_capital': 'SALDO CAPITAL'}
+                columns={'saldo_capital': 'SALDO CAPITAL'}
             )
             
             st.subheader("Filtered Data Preview:")
@@ -47,7 +47,7 @@ def show_q_banco_view():
             # Create Excel file in memory - using BytesIO with ExcelWriter is standard practice
             output: io.BytesIO = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                filtered_df.to_excel(writer, index=False)
+                filtered_df.to_excel(writer, index=False, sheet_name='Hoja1')
             # Reset buffer position for reading
             output.seek(0)
             
