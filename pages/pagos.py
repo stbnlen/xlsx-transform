@@ -1,4 +1,7 @@
 import streamlit as st
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from pagos_frm import show_pagos_frm_view
 from pagos_bci import show_pagos_bci_view
 

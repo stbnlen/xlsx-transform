@@ -728,14 +728,14 @@ def _show_analisis_por_ejecutiva(df_original: pd.DataFrame, monthly: pd.DataFram
             st.write("---")
             st.subheader("📊 Comparación Visual por Ejecutiva")
             
-            # Prepare data for bar chart - get all unique ejecutivas from both periods
-            ejecutivos_all = set(ejecutivo_current['EJECUTIVA'].tolist() + ejecutivo_historical_avg['EJECUTIVA'].tolist())
-            ejecutivos_all = list(ejecutivos_all)
+            # Prepare data for bar chart - only include ejecutivas with data in current month
+            ejecutivos_current = ejecutivo_current['EJECUTIVA'].tolist()
+            ejecutivos_all = list(ejecutivos_current)  # Only current month ejecutivas
             
             # Prepare data for bar chart
             comparison_data = pd.DataFrame({
                 'Ejecutivo': ejecutivos_all,
-                'Mes Actual': [ejecutivo_current.set_index('EJECUTIVA').loc[ej, 'monto_total'] if ej in ejecutivo_current['EJECUTIVA'].values else 0 for ej in ejecutivos_all],
+                'Mes Actual': [ejecutivo_current.set_index('EJECUTIVA').loc[ej, 'monto_total'] for ej in ejecutivos_all],
                 'Promedio Histórico': [ejecutivo_historical_avg.set_index('EJECUTIVA').loc[ej, 'monto_total'] if ej in ejecutivo_historical_avg['EJECUTIVA'].values else 0 for ej in ejecutivos_all]
             })
             

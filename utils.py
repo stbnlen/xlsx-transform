@@ -233,7 +233,26 @@ def test_normality(data: np.ndarray) -> Dict:
 
 def calculate_yearly_stats(df: pd.DataFrame) -> pd.DataFrame:
     """Calculate yearly statistics."""
-    yearly = df.groupby('año')['monto_total'].agg(['mean', 'std', 'min', 'max', 'sum'])
+    # Check if ejecutivas_count column exists
+    if 'ejecutivas_count' in df.columns:
+        yearly = df.groupby('año').agg({
+            'monto_total': ['mean', 'std', 'min', 'max', 'sum'],
+            'ejecutivas_count': 'mean'
+        })
+        # Flatten column multi-index
+        yearly.columns = ['monto_total_mean', 'monto_total_std', 'monto_total_min', 'monto_total_max', 'monto_total_sum', 'ejecutivas_count_mean']
+        yearly = yearly.rename(columns={
+            'monto_total_mean': 'mean',
+            'monto_total_std': 'std',
+            'monto_total_min': 'min',
+            'monto_total_max': 'max',
+            'monto_total_sum': 'sum',
+            'ejecutivas_count_mean': 'ejecutivas_count'
+        })
+    else:
+        yearly = df.groupby('año')['monto_total'].agg(['mean', 'std', 'min', 'max', 'sum'])
+        yearly['ejecutivas_count'] = 0  # Default if column doesn't exist
+    
     yearly = yearly.assign(
         cv=lambda x: (x['std'] / x['mean'] * 100) if x['mean'].ne(0).all() else 0,
         crecimiento=lambda x: x['mean'].pct_change() * 100
@@ -243,7 +262,25 @@ def calculate_yearly_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 def calculate_monthly_stats(df: pd.DataFrame) -> pd.DataFrame:
     """Calculate monthly (seasonal) statistics."""
-    monthly_stats = df.groupby('mes')['monto_total'].agg(['mean', 'std', 'min', 'max'])
+    # Check if ejecutivas_count column exists
+    if 'ejecutivas_count' in df.columns:
+        monthly_stats = df.groupby('mes').agg({
+            'monto_total': ['mean', 'std', 'min', 'max'],
+            'ejecutivas_count': 'mean'
+        })
+        # Flatten column multi-index
+        monthly_stats.columns = ['monto_total_mean', 'monto_total_std', 'monto_total_min', 'monto_total_max', 'ejecutivas_count_mean']
+        monthly_stats = monthly_stats.rename(columns={
+            'monto_total_mean': 'mean',
+            'monto_total_std': 'std',
+            'monto_total_min': 'min',
+            'monto_total_max': 'max',
+            'ejecutivas_count_mean': 'ejecutivas_count'
+        })
+    else:
+        monthly_stats = df.groupby('mes')['monto_total'].agg(['mean', 'std', 'min', 'max'])
+        monthly_stats['ejecutivas_count'] = 0  # Default if column doesn't exist
+    
     monthly_stats['cv'] = monthly_stats['std'] / monthly_stats['mean'] * 100
     meses_lbl = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
     monthly_stats.index = [meses_lbl[m-1] for m in monthly_stats.index]
