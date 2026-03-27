@@ -4,7 +4,7 @@ from q_cmr import show_q_cmr_view
 
 st.title("Asignaciones")
 
-tab1, tab2 = st.tabs(["Q_BANCO", "Q_CMR"])
+tab1, tab2, tab3 = st.tabs(["Q_BANCO", "Q_CMR", "FORUM"])
 
 with tab1:
     st.header("Q_BANCO View")
@@ -13,3 +13,6 @@ with tab1:
 with tab2:
     st.header("Q_CMR View")
     show_q_cmr_view()
+
+with tab3:
+    st.markdown("<h1>en construccion</h1>", unsafe_allow_html=True)
