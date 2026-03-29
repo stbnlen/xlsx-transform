@@ -6,16 +6,24 @@ Una aplicación de Streamlit que permite a los usuarios subir un archivo Excel, 
 
 - Navegar entre módulos usando la navegación nativa de páginas de Streamlit
 - **Módulo Asignaciones**: Contiene las opciones de filtrado Q_BANCO y Q_CMR
-- **Módulo Pagos**: Contiene las opciones de filtrado PAGOS_FRM y PAGOS BCI
+- **Módulo Pagos**: Contiene las opciones de PAGOS_FRM y PAGOS BCI para análisis de datos financieros
 - Subir archivos Excel (.xlsx, .xls)
-- Previsualizar tanto los datos originales como los filtrados en tablas interactivas
-- Filtrado automático de columnas basado en el modo seleccionado:
-  - **Modo Q_BANCO**: rut, dv, n_operacion, origen_core, nombre_completo_cliente, SUCURSAL, CARTERA, ESTADO CRM, ESTADO JUDICIAL, SALDO CAPITAL, % DESCUENTO, comuna_particular
-  - **Modo Q_CMR**: rut, n_operacion_principal, dv, nombre_completo_cliente, CARTERA, CATEGORIA, SUCURSAL, EJECUTIVA ASIGNADA, ESTADO JUDICIAL, DESCUENTO CAMPAÑA, SALDO_DEUDA, TRAMO, estado_cuenta
-  - **Modo PAGOS_FRM**: Columnas específicas para procesamiento financiero (definidas en pagos_frm.py)
-  - **Modo PAGOS BCI**: Columnas específicas para procesamiento BCI (definidas en pagos_bci.py)
-- Descargar el archivo Excel filtrado
-- Construido con Streamlit, pandas y openpyxl
+- Previsualizar tanto los datos originales como los procesados en tablas interactivas
+- Procesamiento/filtrado automático basado en el modo seleccionado:
+  - **Modo Q_BANCO**: Extrae y renombra columnas específicas para operaciones bancarias
+  - **Modo Q_CMR**: Filtra a columnas específicas para gestión de cartera comercial
+  - **Modo PAGOS_FRM**: Análisis comprehensivo de datos financieros que incluye:
+    - Agregación mensual y análisis de tendencias
+    - Estadísticas descriptivas y detección de valores atípicos
+    - Gráficos de análisis exploratorio de datos
+    - Descomposición estacional y análisis de tendencias
+    - Análisis de patrones anuales y mensuales
+    - Análisis de correlaciones
+    - Análisis de desempeño por ejecutiva
+    - Capacidades de modelado predictivo
+  - **Modo PAGOS BCI**: Filtrado específico de columnas para procesamiento BCI (definidas en pagos_bci.py)
+- Descargar archivos Excel procesados
+- Construido con Streamlit, pandas, numpy, scipy, scikit-learn, XGBoost, LightGBM, matplotlib y seaborn
 
 ## Estructura del Proyecto
 
@@ -27,6 +35,7 @@ Una aplicación de Streamlit que permite a los usuarios subir un archivo Excel, 
 - `pagos_frm.py` - Lógica de filtrado para PAGOS_FRM
 - `pagos_bci.py` - Lógica de filtrado para PAGOS BCI
 - `utils.py` - Funciones utilitarias para normalización y validación de columnas
+- `tests/` - Directorio que contiene pruebas unitarias
 - `requirements.txt` - Dependencias de Python
 - `AGENTS.md` - Directrices para agentes de IA que trabajan en este proyecto
 - `README.md` - Este archivo (versión en inglés)

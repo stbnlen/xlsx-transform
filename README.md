@@ -6,16 +6,24 @@ A Streamlit application that allows users to upload an Excel file, preview its c
 
 - Navigate between modules using Streamlit's native page navigation
 - **Asignaciones module**: Contains Q_BANCO and Q_CMR filtering options
-- **Pagos module**: Contains PAGOS_FRM and PAGOS BCI filtering options
+- **Pagos module**: Contains PAGOS_FRM and PAGOS BCI options for financial data analysis
 - Upload Excel files (.xlsx, .xls)
-- Preview both original and filtered data in interactive tables
-- Automatic column filtering based on selected mode:
-  - **Q_BANCO mode**: rut, dv, n_operacion, origen_core, nombre_completo_cliente, SUCURSAL, CARTERA, ESTADO CRM, ESTADO JUDICIAL, SALDO CAPITAL, % DESCUENTO, comuna_particular
-  - **Q_CMR mode**: rut, n_operacion_principal, dv, nombre_completo_cliente, CARTERA, CATEGORIA, SUCURSAL, EJECUTIVA ASIGNADA, ESTADO JUDICIAL, DESCUENTO CAMPAÑA, SALDO_DEUDA, TRAMO, estado_cuenta
-  - **PAGOS_FRM mode**: Specific columns for financial processing (defined in pagos_frm.py)
-  - **PAGOS BCI mode**: Specific columns for BCI processing (defined in pagos_bci.py)
-- Download the filtered Excel file
-- Built with Streamlit, pandas, and openpyxl
+- Preview both original and processed data in interactive tables
+- Automatic column filtering/processing based on selected mode:
+  - **Q_BANCO mode**: Extracts and renames specific columns for banking operations
+  - **Q_CMR mode**: Filters to specific columns for commercial portfolio management
+  - **PAGOS_FRM mode**: Comprehensive financial data analysis including:
+    - Monthly aggregation and trend analysis
+    - Descriptive statistics and outlier detection
+    - Exploratory data analysis charts
+    - Seasonal decomposition and trend analysis
+    - Yearly and monthly pattern analysis
+    - Correlation analysis
+    - Executive performance analysis
+    - Predictive modeling capabilities
+  - **PAGOS BCI mode**: Specific column filtering for BCI processing (defined in pagos_bci.py)
+- Download processed Excel files
+- Built with Streamlit, pandas, numpy, scipy, scikit-learn, XGBoost, LightGBM, matplotlib, and seaborn
 
 ## Project Structure
 
@@ -27,6 +35,7 @@ A Streamlit application that allows users to upload an Excel file, preview its c
 - `pagos_frm.py` - PAGOS_FRM filtering logic
 - `pagos_bci.py` - PAGOS BCI filtering logic
 - `utils.py` - Utility functions for column normalization and validation
+- `tests/` - Directory containing unit tests
 - `requirements.txt` - Python dependencies
 - `AGENTS.md` - Guidelines for AI agents working on this project
 - `README.md` - This file
