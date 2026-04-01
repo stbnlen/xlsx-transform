@@ -3,6 +3,7 @@ pandas
 openpyxl
 scipy
 statsmodels
+matplotlib
 seaborn
 xgboost
 lightgbm

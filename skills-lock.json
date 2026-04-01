@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "statistics-math": {
+      "source": "pluginagentmarketplace/custom-plugin-data-engineer",
+      "sourceType": "github",
+      "computedHash": "2abd4d5a2df0d09a22bc6395f18b5f02499085edee65909bbdabe71e0f577f5d"
+    }
+  }
+}
