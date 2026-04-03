@@ -53,6 +53,15 @@ st.sidebar.metric("Rango de fechas", date_range)
 st.sidebar.metric("Total CountCD", f"{total_calls:,}")
 
 
+def calcular_semana_del_mes(fechas: pd.Series) -> pd.Series:
+    """Calcula la semana del mes (1-5) basada en la fecha."""
+    dias = fechas.dt.day
+    dow = fechas.dt.weekday
+    primer_dow_del_mes = (fechas - pd.to_timedelta(dias - 1, unit="D")).dt.weekday
+    offset = (dow - primer_dow_del_mes + 7) % 7
+    return ((dias - 1 + offset) // 7 + 1).clip(1, 5)
+
+
 def fig_to_streamlit(fig):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
@@ -75,7 +84,7 @@ def crear_features(df: pd.DataFrame) -> pd.DataFrame:
     df["inicio_mes"] = (df["dia_mes"] <= 5).astype(int)
     df["fin_mes"] = (df["dia_mes"] >= 25).astype(int)
     df["encoder_mandante"] = df["id_mandante"].astype("category").cat.codes
-    df["semana_mes"] = ((df["fecha_llamada"].dt.day - 1) // 7).clip(0, 3)
+    df["semana_mes"] = calcular_semana_del_mes(df["fecha_llamada"])
     df["quincena"] = (df["fecha_llamada"].dt.day <= 15).astype(int)
     return df
 
@@ -107,7 +116,7 @@ def crear_features_estacionalidad(df: pd.DataFrame) -> dict:
         datos = df[df["id_mandante"] == mandante].copy()
         datos = datos.sort_values("fecha_llamada").reset_index(drop=True)
         datos["dia_semana"] = datos["fecha_llamada"].dt.dayofweek
-        datos["semana_mes"] = ((datos["fecha_llamada"].dt.day - 1) // 7).clip(0, 3)
+        datos["semana_mes"] = calcular_semana_del_mes(datos["fecha_llamada"])
         datos["mes"] = datos["fecha_llamada"].dt.month
         datos["anio"] = datos["fecha_llamada"].dt.year
 
@@ -124,6 +133,9 @@ def crear_features_estacionalidad(df: pd.DataFrame) -> dict:
         seasonal_semana = datos.groupby("semana_mes")["countcd"].mean()
         semana_factor = seasonal_semana / global_avg
 
+        seasonal_mes = datos.groupby("mes")["countcd"].mean()
+        mes_factor = seasonal_mes / global_avg
+
         monthly_avg = datos.groupby(["anio", "mes"])["countcd"].mean()
         recent_months = monthly_avg.tail(6)
         trend_factor = recent_months.mean() / global_avg if len(recent_months) > 0 else 1.0
@@ -132,6 +144,7 @@ def crear_features_estacionalidad(df: pd.DataFrame) -> dict:
             "global_avg": global_avg,
             "dow_factor": dow_factor,
             "semana_factor": semana_factor.to_dict(),
+            "mes_factor": mes_factor.to_dict(),
             "trend_factor": trend_factor,
         }
 
@@ -160,6 +173,7 @@ def entrenar_y_predecir(df: pd.DataFrame) -> pd.DataFrame:
         global_avg = est["global_avg"]
         dow_factor = est["dow_factor"]
         semana_factor = est["semana_factor"]
+        mes_factor = est["mes_factor"]
         trend = est["trend_factor"]
 
         for dia in range(1, dias_en_mes + 1):
@@ -169,13 +183,16 @@ def entrenar_y_predecir(df: pd.DataFrame) -> pd.DataFrame:
             if dia_semana >= 5:
                 continue
 
-            semana_mes = min((dia - 1) // 7, 3)
+            primer_dia_mes = datetime(anio, mes, 1)
+            offset = (primer_dia_mes.weekday() - primer_dia_mes.weekday() + 7) % 7
+            semana_mes = min((dia - 1 + (dia_semana - primer_dia_mes.weekday() + 7) % 7) // 7 + 1, 5)
 
             base = global_avg * trend
             factor_dow = dow_factor.get(dia_semana, 1.0)
             factor_semana = semana_factor.get(semana_mes, 1.0)
+            factor_mes = mes_factor.get(mes, 1.0)
 
-            prediccion = base * factor_dow * factor_semana
+            prediccion = base * factor_dow * factor_semana * factor_mes
             prediccion = max(prediccion, 0)
 
             filas_prediccion.append({
@@ -472,6 +489,7 @@ with tab6:
                 "Dia": ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"],
                 "Factor": [est["dow_factor"].get(i, 1.0) for i in range(5)],
             })
+            st.write("**Factor por dia de semana:**")
             st.dataframe(dow_df.style.format({"Factor": "{:.3f}"}), use_container_width=True)
 
             fig, ax = plt.subplots(figsize=(6, 3))
@@ -479,6 +497,42 @@ with tab6:
             ax.axhline(y=1.0, color="red", linestyle="--", alpha=0.5)
             ax.set_title(f"Factor dia de semana - {mandante}")
             ax.set_ylabel("Multiplicador")
+            fig.tight_layout()
+            fig_to_streamlit(fig)
+
+            semana_df = pd.DataFrame({
+                "Semana del Mes": [1, 2, 3, 4, 5],
+                "Factor": [est["semana_factor"].get(i, 1.0) for i in range(1, 6)],
+            })
+            st.write("**Factor por semana del mes:**")
+            st.dataframe(semana_df.style.format({"Factor": "{:.3f}"}), use_container_width=True)
+
+            fig, ax = plt.subplots(figsize=(6, 3))
+            ax.bar(semana_df["Semana del Mes"], semana_df["Factor"], color=sns.color_palette("Blues_d", 5))
+            ax.axhline(y=1.0, color="red", linestyle="--", alpha=0.5)
+            ax.set_title(f"Factor semana del mes - {mandante}")
+            ax.set_xlabel("Semana del Mes")
+            ax.set_ylabel("Multiplicador")
+            ax.set_xticks([1, 2, 3, 4, 5])
+            fig.tight_layout()
+            fig_to_streamlit(fig)
+
+            nombres_meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+            mes_df = pd.DataFrame({
+                "Mes": nombres_meses,
+                "Factor": [est["mes_factor"].get(i, 1.0) for i in range(1, 13)],
+            })
+            st.write("**Factor por mes (estacionalidad anual):**")
+            st.dataframe(mes_df.style.format({"Factor": "{:.3f}"}), use_container_width=True)
+
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.bar(mes_df["Mes"], mes_df["Factor"], color=sns.color_palette("Greens_d", 12))
+            ax.axhline(y=1.0, color="red", linestyle="--", alpha=0.5)
+            ax.set_title(f"Factor mensual anual - {mandante}")
+            ax.set_xlabel("Mes")
+            ax.set_ylabel("Multiplicador")
+            plt.xticks(rotation=45, ha="right")
             fig.tight_layout()
             fig_to_streamlit(fig)
     else:
