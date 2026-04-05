@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import io
+from datetime import datetime
 
 from utils_new_cd import (
     calcular_semana_del_mes,
@@ -248,6 +249,7 @@ with tab5:
                 "Skewness",
                 "Kurtosis",
                 "Total",
+                "Coef. Variacion",
             ],
             "Valor": [
                 f"{df['countcd'].mean():.2f}",
@@ -261,6 +263,7 @@ with tab5:
                 f"{df['countcd'].skew():.4f}",
                 f"{df['countcd'].kurtosis():.4f}",
                 f"{df['countcd'].sum():,.0f}",
+                f"{df['countcd'].std() / df['countcd'].mean():.4f}" if df['countcd'].mean() != 0 else "N/A",
             ],
         })
         st.dataframe(stats_df, use_container_width=True)
@@ -277,14 +280,73 @@ with tab5:
         top_dates["fecha_llamada"] = top_dates["fecha_llamada"].dt.strftime("%Y-%m-%d")
         st.dataframe(top_dates, use_container_width=True)
 
-    st.write("**Matriz de correlacion (CountCD vs dia del ano):**")
+    st.write("**Estadisticas por mandante:**")
+    mandante_stats = df.groupby("id_mandante")["countcd"].agg([
+        ("mean", "mean"),
+        ("median", "median"),
+        ("std", "std"),
+        ("min", "min"),
+        ("max", "max"),
+        ("count", "count"),
+    ]).reset_index()
+    mandante_stats.columns = ["Mandante", "Media", "Mediana", "Std", "Min", "Max", "Registros"]
+    mandante_stats = mandante_stats.sort_values("Media", ascending=False)
+    st.dataframe(mandante_stats.style.format({
+        "Media": "{:.2f}",
+        "Mediana": "{:.2f}",
+        "Std": "{:.2f}",
+        "Min": "{:.0f}",
+        "Max": "{:.0f}",
+        "Registros": "{:.0f}",
+    }), use_container_width=True)
+
+    st.write("**Matriz de correlacion (features temporales vs CountCD):**")
     df_corr = df.copy()
     df_corr["dia_ano"] = df_corr["fecha_llamada"].dt.dayofyear
-    corr_matrix = df_corr[["countcd", "dia_ano"]].corr()
-    fig, ax = plt.subplots(figsize=(5, 4))
-    sns.heatmap(corr_matrix, annot=True, cmap="RdBu_r", vmin=-1, vmax=1, ax=ax)
-    ax.set_title("Correlacion CountCD vs Dia del Ano")
+    df_corr["dia_mes"] = df_corr["fecha_llamada"].dt.day
+    df_corr["mes"] = df_corr["fecha_llamada"].dt.month
+    df_corr["dia_semana_num"] = df_corr["fecha_llamada"].dt.dayofweek
+    df_corr["semana_mes"] = calcular_semana_del_mes(df_corr["fecha_llamada"])
+    df_corr["es_lunes"] = (df_corr["dia_semana_num"] == 0).astype(int)
+    df_corr["es_viernes"] = (df_corr["dia_semana_num"] == 4).astype(int)
+
+    corr_cols = ["countcd", "dia_ano", "dia_mes", "mes", "dia_semana_num", "semana_mes", "es_lunes", "es_viernes"]
+    corr_matrix = df_corr[corr_cols].corr()
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    sns.heatmap(corr_matrix, annot=True, cmap="RdBu_r", vmin=-1, vmax=1, ax=ax, fmt=".2f", linewidths=0.5)
+    ax.set_title("Correlacion: CountCD vs Features Temporales")
+    labels = ["CountCD", "Dia del ano", "Dia del mes", "Mes", "Dia semana", "Semana del mes", "Es Lunes", "Es Viernes"]
+    ax.set_xticklabels(labels, rotation=45, ha="right")
+    ax.set_yticklabels(labels, rotation=0)
+    fig.tight_layout()
     fig_to_streamlit(fig)
+
+    st.write("**CountCD promedio por dia de la semana:**")
+    df["dia_semana_num"] = df["fecha_llamada"].dt.dayofweek
+    day_names = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]
+    dow_agg = df.groupby("dia_semana_num")["countcd"].agg(["mean", "sum", "count"]).reset_index()
+    dow_agg["dia_nombre"] = dow_agg["dia_semana_num"].map(lambda x: day_names[x] if x < 7 else "Desconocido")
+    dow_agg = dow_agg.sort_values("dia_semana_num")
+    st.dataframe(dow_agg[["dia_nombre", "mean", "sum", "count"]].rename(columns={
+        "dia_nombre": "Dia",
+        "mean": "Promedio",
+        "sum": "Total",
+        "count": "Registros",
+    }).style.format({"Promedio": "{:.2f}", "Total": "{:.0f}", "Registros": "{:.0f}"}), use_container_width=True)
+
+    st.write("**CountCD promedio por mes:**")
+    month_names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    month_agg = df.groupby(df["fecha_llamada"].dt.month)["countcd"].agg(["mean", "sum", "count"]).reset_index()
+    month_agg["mes_nombre"] = month_agg["fecha_llamada"].map(lambda x: month_names[x - 1] if 1 <= x <= 12 else "Desconocido")
+    month_agg = month_agg.sort_values("fecha_llamada")
+    st.dataframe(month_agg[["mes_nombre", "mean", "sum", "count"]].rename(columns={
+        "mes_nombre": "Mes",
+        "mean": "Promedio",
+        "sum": "Total",
+        "count": "Registros",
+    }).style.format({"Promedio": "{:.2f}", "Total": "{:.0f}", "Registros": "{:.0f}"}), use_container_width=True)
 
 # Tab 6: Prediccion
 with tab6:
