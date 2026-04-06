@@ -32,6 +32,16 @@ def crear_features(df: pd.DataFrame) -> pd.DataFrame:
     df["encoder_mandante"] = df["id_mandante"].astype("category").cat.codes
     df["semana_mes"] = calcular_semana_del_mes(df["fecha_llamada"])
     df["quincena"] = (df["fecha_llamada"].dt.day <= 15).astype(int)
+
+    if "hora_llamada" in df.columns:
+        df["hora"] = pd.to_numeric(df["hora_llamada"], errors="coerce")
+        df["es_manana"] = (df["hora"] < 12).astype(int)
+        df["es_tarde"] = ((df["hora"] >= 12) & (df["hora"] < 18)).astype(int)
+        df["es_noche"] = (df["hora"] >= 18).astype(int)
+
+    if "grupo" in df.columns:
+        df["encoder_grupo"] = df["grupo"].astype("category").cat.codes
+
     return df
 
 
@@ -57,9 +67,11 @@ def crear_features_lag(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def crear_features_estacionalidad(df: pd.DataFrame) -> dict:
+    daily = df.groupby(["id_mandante", "fecha_llamada"]).size().reset_index(name="countcd")
+
     estacionalidad = {}
-    for mandante in df["id_mandante"].unique():
-        datos = df[df["id_mandante"] == mandante].copy()
+    for mandante in daily["id_mandante"].unique():
+        datos = daily[daily["id_mandante"] == mandante].copy()
         datos = datos.sort_values("fecha_llamada").reset_index(drop=True)
         datos["dia_semana"] = datos["fecha_llamada"].dt.dayofweek
         datos["semana_mes"] = calcular_semana_del_mes(datos["fecha_llamada"])
@@ -130,7 +142,6 @@ def entrenar_y_predecir(df: pd.DataFrame) -> tuple:
                 continue
 
             primer_dia_mes = datetime(anio, mes, 1)
-            offset = (primer_dia_mes.weekday() - primer_dia_mes.weekday() + 7) % 7
             semana_mes = min((dia - 1 + (dia_semana - primer_dia_mes.weekday() + 7) % 7) // 7 + 1, 5)
 
             base = global_avg * trend

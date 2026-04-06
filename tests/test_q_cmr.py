@@ -130,6 +130,7 @@ def test_show_q_cmr_view_with_data(mock_read_excel, mock_st):
         'ESTADO JUDICIAL': ['No Judicial', 'Judicial'],
         'DESCUENTO CAMPAÑA': [5, 10],
         'SALDO_DEUDA': [50000, 75000],
+        'ESTADO INICIAL': ['Normal', 'Vencido'],
         'TRAMO': ['Tramo 1', 'Tramo 2'],
         'estado_cuenta': ['Al día', 'Vencido']
     })

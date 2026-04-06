@@ -249,14 +249,23 @@ def test_crear_features_estacionalidad_dow_factor_has_7_entries():
 
 
 def test_crear_features_estacionalidad_global_avg():
-    """Test that global_avg matches the mean of countcd."""
+    """Test that global_avg matches the mean of daily counts."""
     df = pd.DataFrame({
-        'id_mandante': ['A', 'A', 'A'],
-        'fecha_llamada': pd.to_datetime(['2026-04-01', '2026-04-02', '2026-04-03']),
-        'countcd': [10, 20, 30],
+        'id_mandante': ['A', 'A', 'A', 'A', 'A'],
+        'fecha_llamada': pd.to_datetime(['2026-04-01', '2026-04-01', '2026-04-02', '2026-04-02', '2026-04-03']),
     })
     result = crear_features_estacionalidad(df)
-    assert result['A']['global_avg'] == 20.0
+    assert result['A']['global_avg'] == 5.0 / 3
+
+
+def test_crear_features_estacionalidad_global_avg_daily():
+    """Test that global_avg is computed from daily aggregated counts."""
+    df = pd.DataFrame({
+        'id_mandante': ['A', 'A', 'A'],
+        'fecha_llamada': pd.to_datetime(['2026-04-01', '2026-04-01', '2026-04-02']),
+    })
+    result = crear_features_estacionalidad(df)
+    assert result['A']['global_avg'] == 1.5
 
 
 # --- entrenar_y_predecir ---
