@@ -22,7 +22,7 @@ def show_q_cmr_view():
         
         columns_to_keep = ['rut', 'n_operacion_principal', 'dv', 'nombre_completo_cliente', 
                           'CARTERA', 'CATEGORIA', 'SUCURSAL', 'EJECUTIVA ASIGNADA', 
-                          'ESTADO JUDICIAL', 'DESCUENTO CAMPAÑA', 'SALDO_DEUDA', 'TRAMO', 
+                          'ESTADO JUDICIAL', 'DESCUENTO CAMPAÑA', 'SALDO_DEUDA', 'ESTADO INICIAL', 'TRAMO', 
                           'estado_cuenta']
             
         missing_columns, column_mapping = validate_required_columns(df.columns, columns_to_keep)
@@ -44,7 +44,7 @@ def show_q_cmr_view():
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                filtered_df.to_excel(writer, index=False)
+                filtered_df.to_excel(writer, index=False, sheet_name="Hoja1")
             
             st.download_button(
                 label="Download Filtered Excel",
