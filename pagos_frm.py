@@ -96,7 +96,6 @@ def show_pagos_frm_view():
          
         if 'AÑO_MES' in df_clean.columns and date_columns:
             st.write("---")
-            st.subheader("📊 Monthly Aggregation Analysis")
               
             amount_col = find_amount_column(df_clean)
                 
@@ -105,16 +104,39 @@ def show_pagos_frm_view():
                      monthly = aggregate_monthly(df_clean, 'MONTO')
                         
                      if monthly is not None and len(monthly) > 0:
-                         _show_monthly_metrics(monthly)
-                         _show_descriptive_stats(monthly)
-                         _show_eda_charts(monthly, df_clean, amount_col)
-                         _show_seasonal_analysis(monthly)
-                         _show_trend_analysis(monthly)
-                         _show_patterns_analysis(monthly)
-                         _show_correlation_analysis(monthly)
-                         _show_analisis_por_ejecutiva(df_clean, monthly)
-                         _show_analisis_mensual_comparativo(monthly, df_clean)
-                         _show_prediction_analysis(monthly, df_clean)
+                         tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+                             "Vista General",
+                             "Estadísticas",
+                             "Serie Temporal",
+                             "Correlaciones",
+                             "Ejecutiva",
+                             "Comparativo",
+                             "Predicción",
+                         ])
+                         
+                         with tab1:
+                             _show_monthly_metrics(monthly)
+                             _show_eda_charts(monthly, df_clean, amount_col)
+                         
+                         with tab2:
+                             _show_descriptive_stats(monthly)
+                         
+                         with tab3:
+                             _show_seasonal_analysis(monthly)
+                             _show_trend_analysis(monthly)
+                             _show_patterns_analysis(monthly)
+                         
+                         with tab4:
+                             _show_correlation_analysis(monthly)
+                         
+                         with tab5:
+                             _show_analisis_por_ejecutiva(df_clean, monthly)
+                         
+                         with tab6:
+                             _show_analisis_mensual_comparativo(monthly, df_clean)
+                         
+                         with tab7:
+                             _show_prediction_analysis(monthly, df_clean)
                      elif monthly is not None:
                          st.warning("⚠️ No historical data available for detailed analysis")
                      else:

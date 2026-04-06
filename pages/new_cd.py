@@ -65,13 +65,14 @@ def fig_to_streamlit(fig):
 
 
 # Tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "Vista General",
     "Por Mandante",
     "Serie Temporal",
     "Distribucion",
     "Estadisticas",
     "Prediccion",
+    "Descargar Metas",
 ])
 
 # Tab 1: General overview
@@ -393,6 +394,11 @@ with tab6:
             fig.tight_layout()
             fig_to_streamlit(fig)
 
+        metas_globales = {}
+        for mandante in df_prediccion["nombre_mandante"].unique():
+            df_mandante = df_prediccion[df_prediccion["nombre_mandante"] == mandante]
+            metas_globales[mandante] = df_mandante["prediccion"].sum()
+
         st.write("### Factores Estacionales por Mandante")
         for mandante, est in estacionalidad.items():
             st.write(f"**{mandante}** (promedio global: {est['global_avg']:.1f}, tendencia: {est['trend_factor']:.2f}x)")
@@ -449,3 +455,47 @@ with tab6:
             fig_to_streamlit(fig)
     else:
         st.warning("No hay datos suficientes para generar la prediccion.")
+
+# Tab 7: Descargar Metas
+with tab7:
+    st.subheader("Descargar Metas Diarias")
+
+    hoy = datetime.now()
+    mes_actual = hoy.strftime("%B %Y")
+
+    with st.spinner("Calculando metas..."):
+        df_prediccion, estacionalidad, _ = entrenar_y_predecir(df)
+
+    if len(df_prediccion) > 0:
+        metas_globales = {}
+        for mandante in df_prediccion["nombre_mandante"].unique():
+            df_mandante = df_prediccion[df_prediccion["nombre_mandante"] == mandante]
+            metas_globales[mandante] = df_mandante["prediccion"].sum()
+
+        download_rows = []
+        for _, row in df_prediccion.iterrows():
+            download_rows.append({
+                "dia": row["dia_mes"],
+                "numero de mes": row["mes"],
+                "año": hoy.year,
+                "cartera": row["nombre_mandante"],
+                "meta diaria": row["prediccion"],
+                "meta global": metas_globales[row["nombre_mandante"]],
+            })
+
+        df_download = pd.DataFrame(download_rows)
+
+        st.dataframe(df_download, use_container_width=True)
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df_download.to_excel(writer, index=False, sheet_name="Hoja1")
+
+        st.download_button(
+            label="Descargar Metas Diarias",
+            data=output.getvalue(),
+            file_name=f"metas_diarias_{mes_actual.replace(' ', '_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    else:
+        st.warning("No hay datos suficientes para generar las metas.")
