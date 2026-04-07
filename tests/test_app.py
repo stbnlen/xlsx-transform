@@ -42,7 +42,7 @@ def test_asig_page_tabs():
         content = f.read()
     
     # Check that the tabs are created with the correct names
-    assert 'st.tabs(["Q_BANCO", "Q_CMR", "FORUM"])' in content
+    assert 'st.tabs(["Q_BANCO", "Q_CMR", "FORUM", "BCI"])' in content
     
     # Check that each tab context uses the correct view function
     assert 'with tab1:' in content
@@ -51,6 +51,8 @@ def test_asig_page_tabs():
     assert 'show_q_cmr_view()' in content
     assert 'with tab3:' in content
     assert 'en construccion' in content
+    assert 'with tab4:' in content
+    assert 'show_bci_view()' in content
 
 
 def test_pagos_page_tabs():
