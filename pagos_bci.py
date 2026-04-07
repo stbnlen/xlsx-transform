@@ -68,7 +68,7 @@ def show_bci_view():
 
         df_result["ORIGEN"] = "STOCK"
 
-        df_result["rut_cliente.1"] = df_result["rut_cliente.1"].astype(str).str.lstrip("0")
+        df_result["rut_cliente.1"] = df_result["rut_cliente.1"].astype(str).str[:-1].str.lstrip("0")
 
         st.subheader("Data Preview (First 5 rows):")
         st.dataframe(df_result.head())
