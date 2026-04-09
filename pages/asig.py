@@ -29,7 +29,7 @@ def process_forum_data(df_castigo, df_vigente, filename1, filename2):
         'FECHA CASTIGO',    # From data
         'CIUDAD',           # Empty column
         'CARTERA',          # From data
-        'Tipo gestión',     # Empty column
+        'Tipo gestión ',     # Empty column with trailing space
         'Año castigo'       # Year from FECHA CASTIGO (last column)
     ]
     
@@ -83,23 +83,23 @@ def process_single_file(df, filename, file_type):
         elif 'FECHA CASTIGO' not in processed_df.columns:
             processed_df['FECHA CASTIGO'] = ''
             
-        # For CARTERA, handle case sensitivity
-        if 'CARTERA' not in processed_df.columns:
-            if 'cartera' in df.columns:
-                processed_df['CARTERA'] = df['cartera']
-            elif 'CARTERA' in df.columns:
-                processed_df['CARTERA'] = df['CARTERA']
-            else:
-                processed_df['CARTERA'] = ''
-                 
-        # For Tipo gestión, map from Tipo de gestión column
-        if 'Tipo gestión' not in processed_df.columns:
-            if 'Tipo de gestión' in df.columns:
-                processed_df['Tipo gestión'] = df['Tipo de gestión']
-            elif 'Tipo gestión' in df.columns:
-                processed_df['Tipo gestión'] = df['Tipo gestión']
-            else:
-                processed_df['Tipo gestión'] = ''
+         # For CARTERA, handle case sensitivity
+         if 'CARTERA' not in processed_df.columns:
+             if 'cartera' in df.columns:
+                 processed_df['CARTERA'] = df['cartera']
+             elif 'CARTERA' in df.columns:
+                 processed_df['CARTERA'] = df['CARTERA']
+             else:
+                 processed_df['CARTERA'] = ''
+                  
+         # For Tipo gestión, map from Tipo de gestión column
+         if 'Tipo gestión ' not in processed_df.columns:
+             if 'Tipo de gestión' in df.columns:
+                 processed_df['Tipo gestión '] = df['Tipo de gestión']
+             elif 'Tipo gestión' in df.columns:
+                 processed_df['Tipo gestión '] = df['Tipo gestión']
+             else:
+                 processed_df['Tipo gestión '] = ''
                  
         # Add Año castigo column based on FECHA CASTIGO
         if 'Año castigo' not in processed_df.columns and 'FECHA CASTIGO' in processed_df.columns:
