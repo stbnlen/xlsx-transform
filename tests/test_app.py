@@ -50,7 +50,11 @@ def test_asig_page_tabs():
     assert 'with tab2:' in content
     assert 'show_q_cmr_view()' in content
     assert 'with tab3:' in content
-    assert 'en construccion' in content
+    assert 'st.header("FORUM Module")' in content
+    assert 'st.subheader("Castigo")' in content
+    assert 'st.subheader("Vigente")' in content
+    assert 'def process_forum_data(' in content  # New function for processing
+    assert 'def process_single_file(' in content  # Helper function
     assert 'with tab4:' in content
     assert 'show_bci_view()' in content
 
