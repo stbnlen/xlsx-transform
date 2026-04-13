@@ -1,11 +1,7 @@
 import streamlit as st
 
 # Set page configuration
-st.set_page_config(
-    page_title="Excel Transformer",
-    page_icon="📊",
-    layout="wide"
-)
+st.set_page_config(page_title="Excel Transformer", page_icon="📊", layout="wide")
 
 # Main title and description
 st.title("Excel Transformer")
