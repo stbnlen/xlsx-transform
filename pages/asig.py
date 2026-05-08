@@ -82,13 +82,13 @@ def process_single_file(
         elif "CONTRATO" not in processed_df.columns:
             processed_df["CONTRATO"] = ""
 
-        if (
-            "NOMBRE CLIENTE" not in processed_df.columns
-            and "NOMBRE CLIENTE" in df.columns
-        ):
-            processed_df["NOMBRE CLIENTE"] = df["NOMBRE CLIENTE"]
-        elif "NOMBRE CLIENTE" not in processed_df.columns:
-            processed_df["NOMBRE CLIENTE"] = ""
+        if "NOMBRE CLIENTE" not in processed_df.columns:
+            if "NOMBRE CLIENTE" in df.columns:
+                processed_df["NOMBRE CLIENTE"] = df["NOMBRE CLIENTE"]
+            elif "Demandado" in df.columns:
+                processed_df["NOMBRE CLIENTE"] = df["Demandado"]
+            else:
+                processed_df["NOMBRE CLIENTE"] = ""
 
         # For MONTO CASTIGO, check multiple possible source column names
         if "MONTO CASTIGO" not in processed_df.columns:
@@ -117,6 +117,8 @@ def process_single_file(
                 processed_df["CARTERA"] = df["cartera"]
             elif "CARTERA" in df.columns:
                 processed_df["CARTERA"] = df["CARTERA"]
+            elif "Marca Cartera" in df.columns:
+                processed_df["CARTERA"] = df["Marca Cartera"]
             else:
                 processed_df["CARTERA"] = ""
         # For Tipo gestión, map from Tipo de gestión column
@@ -153,18 +155,15 @@ def process_single_file(
         elif "CONTRATO" not in processed_df.columns:
             processed_df["CONTRATO"] = ""
 
-        if (
-            "NOMBRE CLIENTE" not in processed_df.columns
-            and "Nombre_Cliente" in df.columns
-        ):
-            processed_df["NOMBRE CLIENTE"] = df["Nombre_Cliente"]
-        elif (
-            "NOMBRE CLIENTE" not in processed_df.columns
-            and "NOMBRE CLIENTE" in df.columns
-        ):
-            processed_df["NOMBRE CLIENTE"] = df["NOMBRE CLIENTE"]
-        elif "NOMBRE CLIENTE" not in processed_df.columns:
-            processed_df["NOMBRE CLIENTE"] = ""
+        if "NOMBRE CLIENTE" not in processed_df.columns:
+            if "Nombre_Cliente" in df.columns:
+                processed_df["NOMBRE CLIENTE"] = df["Nombre_Cliente"]
+            elif "NOMBRE CLIENTE" in df.columns:
+                processed_df["NOMBRE CLIENTE"] = df["NOMBRE CLIENTE"]
+            elif "Demandado" in df.columns:
+                processed_df["NOMBRE CLIENTE"] = df["Demandado"]
+            else:
+                processed_df["NOMBRE CLIENTE"] = ""
 
         # For vigente files, MONTO CASTIGO checks multiple possible source columns
         if "MONTO CASTIGO" not in processed_df.columns:
@@ -193,6 +192,8 @@ def process_single_file(
                 processed_df["CARTERA"] = df["cartera"]
             elif "CARTERA" in df.columns:
                 processed_df["CARTERA"] = df["CARTERA"]
+            elif "Marca Cartera" in df.columns:
+                processed_df["CARTERA"] = df["Marca Cartera"]
             else:
                 processed_df["CARTERA"] = (
                     "Dual vigente"  # Default for vigente files when column not found
