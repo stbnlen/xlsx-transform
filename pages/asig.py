@@ -66,6 +66,8 @@ def process_single_file(
     # Clean RUT column (remove dash and everything after it)
     if "RUT" in processed_df.columns:
         processed_df["RUT"] = processed_df["RUT"].astype(str).str.split("-").str[0]
+    elif "RUT COMP" in processed_df.columns:
+        processed_df["RUT"] = processed_df["RUT COMP"].astype(str).str.split("-").str[0]
     else:
         # If RUT column doesn't exist, create empty column
         processed_df["RUT"] = ""
