@@ -33,7 +33,7 @@ def process_forum_data(
         "CONTRATO",  # From data
         "RUT",  # From data (cleaned)
         "NOMBRE CLIENTE",  # From data
-        "MONTO CASIIGO",  # From data
+        "MONTO CASTIGO",  # From data
         "ETAPA DEMANDA",  # Empty column
         "FECHA CASTIGO",  # From data
         "CIUDAD",  # Empty column
@@ -46,6 +46,11 @@ def process_forum_data(
     for col in column_order:
         if col not in combined_df.columns:
             combined_df[col] = ""
+
+    # Fill NaN with empty string in columns that should be empty
+    for col in ["ETAPA DEMANDA", "CIUDAD", "Tipo gestión "]:
+        if col in combined_df.columns:
+            combined_df[col] = combined_df[col].fillna("")
 
     # Return dataframe with columns in the specified order
     return combined_df[column_order]
@@ -85,12 +90,18 @@ def process_single_file(
         elif "NOMBRE CLIENTE" not in processed_df.columns:
             processed_df["NOMBRE CLIENTE"] = ""
 
-        # For MONTO CASIIGO, use MONTO CASTIGO from castigo file
-        if "MONTO CASIIGO" not in processed_df.columns:
+        # For MONTO CASTIGO, check multiple possible source column names
+        if "MONTO CASTIGO" not in processed_df.columns:
             if "MONTO CASTIGO" in df.columns:
-                processed_df["MONTO CASIIGO"] = df["MONTO CASTIGO"]
+                processed_df["MONTO CASTIGO"] = df["MONTO CASTIGO"]
+            elif "Monto Castigo" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["Monto Castigo"]
+            elif "SALDO CAPITAL SEMAFORO" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["SALDO CAPITAL SEMAFORO"]
+            elif "MONTO CASIIGO" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["MONTO CASIIGO"]
             else:
-                processed_df["MONTO CASIIGO"] = ""
+                processed_df["MONTO CASTIGO"] = ""
 
         if (
             "FECHA CASTIGO" not in processed_df.columns
@@ -155,13 +166,18 @@ def process_single_file(
         elif "NOMBRE CLIENTE" not in processed_df.columns:
             processed_df["NOMBRE CLIENTE"] = ""
 
-        # For vigente files, MONTO CASIIGO is typically 0 or empty since they're current accounts
-        if "MONTO CASIIGO" not in processed_df.columns:
-            # Check if there's a balance column that might represent castigo amount
+        # For vigente files, MONTO CASTIGO checks multiple possible source columns
+        if "MONTO CASTIGO" not in processed_df.columns:
             if "fSaldoInsoluto" in df.columns:
-                processed_df["MONTO CASIIGO"] = df["fSaldoInsoluto"]
+                processed_df["MONTO CASTIGO"] = df["fSaldoInsoluto"]
+            elif "Monto Castigo" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["Monto Castigo"]
+            elif "SALDO CAPITAL SEMAFORO" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["SALDO CAPITAL SEMAFORO"]
+            elif "MONTO CASIIGO" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["MONTO CASIIGO"]
             else:
-                processed_df["MONTO CASIIGO"] = 0  # Default to 0 for vigente accounts
+                processed_df["MONTO CASTIGO"] = 0
 
         if (
             "FECHA CASTIGO" not in processed_df.columns
@@ -279,7 +295,7 @@ with tab3:
         except Exception as e:
             st.error(f"Error processing files: {e}")
             st.info(
-                "Please make sure your files have the required columns: CONTRATO, RUT, NOMBRE CLIENTE, MONTO CASIIGO, FECHA CASTIGO, CARTERA"
+                "Please make sure your files have the required columns: CONTRATO, RUT, NOMBRE CLIENTE, MONTO CASTIGO, FECHA CASTIGO, CARTERA"
             )
     elif uploaded_file1 is not None:
         st.info("Please upload the Vigente file to proceed.")

@@ -22,7 +22,7 @@ def create_sample_castigo_data():
         "CONTRATO": ["C001", "C002", "C003"],
         "RUT": ["19513991-1", "20123456-2", "18765432-K"],
         "NOMBRE CLIENTE": ["Juan Pérez", "María González", "Carlos López"],
-        "MONTO CASIIGO": [1500000, 2200000, 800000],
+        "MONTO CASTIGO": [1500000, 2200000, 800000],
         "FECHA CASTIGO": ["2026-01-15", "2026-02-20", "2026-03-10"],
         "CARTERA": ["Comercial", "Consumo", "Hipotecario"],
     }
@@ -35,7 +35,7 @@ def create_sample_vigente_data():
         "CONTRATO": ["V001", "V002"],
         "RUT": ["22345678-9", "19876543-2"],
         "NOMBRE CLIENTE": ["Ana Ruiz", "Pedro Sánchez"],
-        "MONTO CASIIGO": [0, 0],  # Vigente accounts typically have 0 castigo amount
+        "MONTO CASTIGO": [0, 0],
         "FECHA CASTIGO": ["", ""],  # No castigo date for vigente accounts
         "CARTERA": ["Comercial", "Consumo"],
     }
@@ -62,7 +62,7 @@ def test_process_single_file():
                 "CONTRATO",
                 "RUT",
                 "NOMBRE CLIENTE",
-                "MONTO CASIIGO",
+                "MONTO CASTIGO",
                 "FECHA CASTIGO",
                 "CARTERA",
             ]
@@ -97,7 +97,7 @@ def test_process_single_file():
                 "CONTRATO",
                 "RUT",
                 "NOMBRE CLIENTE",
-                "MONTO CASIIGO",
+                "MONTO CASTIGO",
                 "FECHA CASTIGO",
                 "CARTERA",
             ]
@@ -152,7 +152,7 @@ def test_process_forum_data():
         ciudad == "" for ciudad in combined_df["CIUDAD"]
     ), "CIUDAD should be empty"
     assert all(
-        tipo_gestion == "" for tipo_gestion in combined_df["Tipo gestión"]
+        tipo_gestion == "" for tipo_gestion in combined_df["Tipo gestión "]
     ), "Tipo gestión should be empty"
 
     # Check column order
@@ -161,12 +161,13 @@ def test_process_forum_data():
         "CONTRATO",
         "RUT",
         "NOMBRE CLIENTE",
-        "MONTO CASIIGO",
+        "MONTO CASTIGO",
         "ETAPA DEMANDA",
         "FECHA CASTIGO",
         "CIUDAD",
         "CARTERA",
-        "Tipo gestión",
+        "Tipo gestión ",
+        "Año castigo",
     ]
     actual_order = list(combined_df.columns)
     assert (
@@ -174,6 +175,52 @@ def test_process_forum_data():
     ), f"Column order incorrect. Expected: {expected_order}, Got: {actual_order}"
 
     print("All tests passed!")
+
+
+def test_monto_castigo_alternate_columns():
+    """Test that MONTO CASTIGO is resolved from alternate column names."""
+    base_cols = {
+        "CONTRATO": ["C001", "C002"],
+        "RUT": ["19513991-1", "20123456-2"],
+        "NOMBRE CLIENTE": ["Juan Pérez", "María González"],
+        "FECHA CASTIGO": ["2026-01-15", "2026-02-20"],
+        "CARTERA": ["Comercial", "Consumo"],
+    }
+
+    # Test "Monto Castigo" as source column for Castigo file
+    df_monto_castigo = pd.DataFrame({**base_cols, "Monto Castigo": [1000, 2000]})
+    result = process_single_file(df_monto_castigo, "test.xlsx", "Castigo")
+    assert "MONTO CASTIGO" in result.columns
+    assert result["MONTO CASTIGO"].iloc[0] == 1000
+
+    # Test "SALDO CAPITAL SEMAFORO" as source column for Castigo file
+    df_saldo = pd.DataFrame({**base_cols, "SALDO CAPITAL SEMAFORO": [3000, 4000]})
+    result = process_single_file(df_saldo, "test.xlsx", "Castigo")
+    assert "MONTO CASTIGO" in result.columns
+    assert result["MONTO CASTIGO"].iloc[0] == 3000
+
+    # Test "Monto Castigo" as source column for Vigente file
+    vigente_cols = {
+        "CONTRATO": ["V001", "V002"],
+        "RUT": ["22345678-9", "19876543-2"],
+        "NOMBRE CLIENTE": ["Ana Ruiz", "Pedro Sánchez"],
+        "FECHA CASTIGO": ["", ""],
+        "CARTERA": ["Comercial", "Consumo"],
+    }
+    df_vigente_monto = pd.DataFrame({**vigente_cols, "Monto Castigo": [5000, 6000]})
+    result = process_single_file(df_vigente_monto, "test.xlsx", "Vigente")
+    assert "MONTO CASTIGO" in result.columns
+    assert result["MONTO CASTIGO"].iloc[0] == 5000
+
+    # Test "SALDO CAPITAL SEMAFORO" as source column for Vigente file
+    df_vigente_saldo = pd.DataFrame(
+        {**vigente_cols, "SALDO CAPITAL SEMAFORO": [7000, 8000]}
+    )
+    result = process_single_file(df_vigente_saldo, "test.xlsx", "Vigente")
+    assert "MONTO CASTIGO" in result.columns
+    assert result["MONTO CASTIGO"].iloc[0] == 7000
+
+    print("All alternate column name tests passed!")
 
 
 if __name__ == "__main__":
