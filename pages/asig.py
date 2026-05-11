@@ -102,6 +102,8 @@ def process_single_file(
                 processed_df["MONTO CASTIGO"] = df["SALDO CAPITAL SEMAFORO"]
             elif "MONTO CASIIGO" in df.columns:
                 processed_df["MONTO CASTIGO"] = df["MONTO CASIIGO"]
+            elif "FSALDOINSOLUTO" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["FSALDOINSOLUTO"]
             else:
                 processed_df["MONTO CASTIGO"] = ""
 
@@ -171,6 +173,8 @@ def process_single_file(
         if "MONTO CASTIGO" not in processed_df.columns:
             if "fSaldoInsoluto" in df.columns:
                 processed_df["MONTO CASTIGO"] = df["fSaldoInsoluto"]
+            elif "FSALDOINSOLUTO" in df.columns:
+                processed_df["MONTO CASTIGO"] = df["FSALDOINSOLUTO"]
             elif "Monto Castigo" in df.columns:
                 processed_df["MONTO CASTIGO"] = df["Monto Castigo"]
             elif "SALDO CAPITAL SEMAFORO" in df.columns:
