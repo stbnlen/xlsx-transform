@@ -8,11 +8,34 @@ import streamlit as st
 
 from styles import setup_page
 from utils_new_cd import (
+    fig_to_streamlit as _fts,
     calc_week_of_month,
     train_and_predict,
 )
 
+
+@st.cache_data(show_spinner=False)
+def cached_train_and_predict(df_cached):
+    """Cached wrapper for train_and_predict to avoid redundant computation."""
+    return train_and_predict(df_cached)
+
+
 setup_page("New CD", "📞")
+
+MESES_ESPANOL = {
+    1: "enero",
+    2: "febrero",
+    3: "marzo",
+    4: "abril",
+    5: "mayo",
+    6: "junio",
+    7: "julio",
+    8: "agosto",
+    9: "septiembre",
+    10: "octubre",
+    11: "noviembre",
+    12: "diciembre",
+}
 
 st.title("New CD - Análisis Exploratorio")
 
@@ -52,18 +75,62 @@ mandantes = df["id_mandante"].unique()
 date_range = f"{df['fecha_llamada'].min().strftime('%Y-%m-%d')} to {df['fecha_llamada'].max().strftime('%Y-%m-%d')}"
 total_contacts = int(df["countcd"].sum())
 
-st.sidebar.header("Resumen general")
-st.sidebar.metric("Registros totales", len(df))
-st.sidebar.metric("Mandantes", len(mandantes))
-st.sidebar.metric("Rango de fechas", date_range)
-st.sidebar.metric("Contactos totales", f"{total_contacts:,}")
+# Resumen general en el cuerpo principal
+summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
+with summary_col1:
+    st.metric("Registros totales", f"{len(df):,}")
+with summary_col2:
+    st.metric("Mandantes", len(mandantes))
+with summary_col3:
+    st.metric("Rango de fechas", date_range)
+with summary_col4:
+    st.metric("Contactos totales", f"{total_contacts:,}")
 
 
-def fig_to_streamlit(fig):
-    from utils_new_cd import fig_to_streamlit as _fts
+# Filtros globales
+st.sidebar.header("Filtros")
+filter_mandante = st.sidebar.multiselect(
+    "Mandante",
+    options=sorted(mandantes),
+    default=list(mandantes),
+    key="filter_mandante",
+)
 
-    _fts(fig, st)
+if "grupo" in df.columns:
+    filter_grupo = st.sidebar.multiselect(
+        "Grupo",
+        options=sorted(df["grupo"].unique()),
+        default=list(df["grupo"].unique()),
+        key="filter_grupo",
+    )
+else:
+    filter_grupo = []
 
+# Aplicar filtros
+df_filtered = df[df["id_mandante"].isin(filter_mandante)].copy()
+if "grupo" in df.columns and filter_grupo:
+    df_filtered = df_filtered[df_filtered["grupo"].isin(filter_grupo)]
+
+# Actualizar variables con datos filtrados
+mandantes_filtered = df_filtered["id_mandante"].unique()
+date_range_filtered = f"{df_filtered['fecha_llamada'].min().strftime('%Y-%m-%d')} a {df_filtered['fecha_llamada'].max().strftime('%Y-%m-%d')}"
+total_contacts_filtered = int(df_filtered["countcd"].sum())
+
+# Actualizar métricas del resumen
+with summary_col1:
+    st.metric("Registros totales", f"{len(df_filtered):,}")
+with summary_col2:
+    st.metric("Mandantes", len(mandantes_filtered))
+with summary_col3:
+    st.metric("Rango de fechas", date_range_filtered)
+with summary_col4:
+    st.metric("Contactos totales", f"{total_contacts_filtered:,}")
+
+# Usar df_filtered para el resto del análisis
+df = df_filtered
+mandantes = mandantes_filtered
+date_range = date_range_filtered
+total_contacts = total_contacts_filtered
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
     [
@@ -79,7 +146,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
 )
 
 with tab1:
-    st.subheader("Dataset Vista general")
+    st.subheader("Vista general del dataset")
     col1, col2, col3 = st.columns(3)
     col1.metric("Filas", len(df))
     col2.metric("Columnas", len(df.columns))
@@ -101,7 +168,7 @@ with tab1:
     )
 
     if "grupo" in df.columns:
-        st.write("**Distribución by Group:**")
+        st.write("**Distribución por grupo:**")
         grupo_counts = df["grupo"].value_counts()
         grupo_df = pd.DataFrame(
             {"Grupo": grupo_counts.index, "Contactos": grupo_counts.values}
@@ -119,10 +186,10 @@ with tab1:
         ax.set_ylabel("Contactos totales")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
     if "hora_llamada" in df.columns:
-        st.write("**Distribución by Hour of Day (7:00 - 21:00):**")
+        st.write("**Distribución por hora del día (7:00 - 21:00):**")
         df_temp = df.copy()
         df_temp["hour"] = pd.to_numeric(df_temp["hora_llamada"], errors="coerce")
         df_temp = df_temp[(df_temp["hour"] >= 7) & (df_temp["hour"] <= 21)]
@@ -133,7 +200,7 @@ with tab1:
         ax.set_xlabel("Hora")
         ax.set_ylabel("Contactos totales")
         fig.tight_layout()
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
     if "rut_dv" in df.columns:
         total_ruts = df["rut_dv"].nunique()
@@ -177,10 +244,10 @@ with tab2:
             mandante_agg["total_contacts"],
             color=sns.color_palette("Blues_d", len(mandante_agg)),
         )
-        ax.set_title("Contactos totales by Mandante")
+        ax.set_title("Contactos totales por mandante")
         ax.set_xlabel("Mandante")
         ax.set_ylabel("Contactos totales")
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
     with col2:
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -190,12 +257,12 @@ with tab2:
             autopct="%1.1f%%",
             colors=sns.color_palette("pastel", len(mandante_agg)),
         )
-        ax.set_title("Percentage Distribución by Mandante")
-        fig_to_streamlit(fig)
+        ax.set_title("Distribución porcentual por mandante")
+        _fts(fig, st)
 
     if "grupo" in df.columns:
         st.write("---")
-        st.write("**Análisis por mandante and Group:**")
+        st.write("**Análisis por mandante y grupo:**")
         mandante_grupo = (
             df.groupby(["id_mandante", "grupo"])["countcd"].sum().reset_index()
         )
@@ -213,7 +280,7 @@ with tab2:
         ax.legend(title="Grupo")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
     st.write("**Tabla resumen por mandante:**")
     st.dataframe(
@@ -230,33 +297,32 @@ with tab2:
     )
 
 with tab3:
-    st.subheader("Series temporales Analysis")
+    st.subheader("Análisis de series temporales")
 
     daily = df.groupby(["fecha_llamada", "id_mandante"])["countcd"].sum().reset_index()
     daily_total = df.groupby("fecha_llamada")["countcd"].sum().reset_index()
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        selected_mandante = st.multiselect(
-            "Select mandantes",
-            options=sorted(mandantes),
-            default=list(mandantes),
-            key="ts_mandante",
-        )
+    selected_mandante = st.multiselect(
+        "Seleccionar mandantes",
+        options=sorted(mandantes),
+        default=list(mandantes),
+        key="ts_mandante",
+    )
 
     filtered_daily = daily[daily["id_mandante"].isin(selected_mandante)]
+
+    col1, col2 = st.columns(2)
 
     fig, ax = plt.subplots(figsize=(10, 5))
     for mandante in filtered_daily["id_mandante"].unique():
         subset = filtered_daily[filtered_daily["id_mandante"] == mandante]
         ax.plot(subset["fecha_llamada"], subset["countcd"], marker="o", label=mandante)
     ax.set_title("Evolución diaria de contactos")
-    ax.set_xlabel("Date")
+    ax.set_xlabel("Fecha")
     ax.set_ylabel("Contactos")
     ax.legend()
     fig.autofmt_xdate()
-    fig_to_streamlit(fig)
+    _fts(fig, st)
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.fill_between(
@@ -267,20 +333,20 @@ with tab3:
     )
     ax.plot(daily_total["fecha_llamada"], daily_total["countcd"], color="steelblue")
     ax.set_title("Total diario (todos los mandantes)")
-    ax.set_xlabel("Date")
+    ax.set_xlabel("Fecha")
     ax.set_ylabel("Contactos totales")
     fig.autofmt_xdate()
-    fig_to_streamlit(fig)
+    _fts(fig, st)
 
     df["day_of_week"] = df["fecha_llamada"].dt.day_name()
     day_order = [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes",
+        "Sábado",
+        "Domingo",
     ]
     day_agg = (
         df.groupby("day_of_week")["countcd"]
@@ -299,10 +365,10 @@ with tab3:
         day_agg["countcd"],
         color=sns.color_palette("viridis", len(day_agg)),
     )
-    ax.set_title("Contactos totales by Day of Week")
+    ax.set_title("Contactos totales por día de la semana")
     ax.set_xlabel("Día")
     ax.set_ylabel("Contactos totales")
-    fig_to_streamlit(fig)
+    _fts(fig, st)
 
     if "grupo" in df.columns:
         st.write("---")
@@ -315,12 +381,12 @@ with tab3:
         for grupo in grupos:
             subset = daily_grupo[daily_grupo["grupo"] == grupo]
             ax.plot(subset["fecha_llamada"], subset["countcd"], marker="o", label=grupo)
-        ax.set_title("Daily Evolution of Contactos por grupo")
-        ax.set_xlabel("Date")
+        ax.set_title("Evolución diaria de contactos por grupo")
+        ax.set_xlabel("Fecha")
         ax.set_ylabel("Contactos")
         ax.legend()
         fig.autofmt_xdate()
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
     if "hora_llamada" in df.columns:
         st.write("---")
@@ -335,16 +401,16 @@ with tab3:
         for mandante in sorted(hora_mandante["id_mandante"].unique()):
             subset = hora_mandante[hora_mandante["id_mandante"] == mandante]
             ax.plot(subset["hour"], subset["countcd"], marker="o", label=mandante)
-        ax.set_title("Hourly Distribución by Mandante")
+        ax.set_title("Distribución horaria por mandante")
         ax.set_xlabel("Hora")
         ax.set_ylabel("Contactos")
         ax.legend()
         ax.set_xticks(range(7, 22))
         fig.tight_layout()
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
 with tab4:
-    st.subheader("Distribución Analysis")
+    st.subheader("Análisis de distribución")
 
     daily_per_mandante = (
         df.groupby(["fecha_llamada", "id_mandante"])["countcd"].sum().reset_index()
@@ -357,10 +423,10 @@ with tab4:
         sns.histplot(
             daily_per_mandante["countcd"], bins=50, kde=True, ax=ax, color="steelblue"
         )
-        ax.set_title("Distribución of Daily Contacts")
+        ax.set_title("Distribución de contactos diarios")
         ax.set_xlabel("Contactos por día")
         ax.set_ylabel("Frecuencia")
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
     with col2:
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -374,9 +440,9 @@ with tab4:
         ax.set_title("Diagrama de caja por mandante")
         ax.set_xlabel("Mandante")
         ax.set_ylabel("Contactos por día")
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
-    st.write("**Distribución statistics by mandante:**")
+    st.write("**Estadísticas de distribución por mandante:**")
     dist_stats = (
         daily_per_mandante.groupby("id_mandante")["countcd"].describe().reset_index()
     )
@@ -388,7 +454,7 @@ with tab4:
 
     if "grupo" in df.columns:
         st.write("---")
-        st.write("**Distribución by Group:**")
+        st.write("**Distribución por grupo:**")
         daily_per_grupo = (
             df.groupby(["fecha_llamada", "grupo"])["countcd"].sum().reset_index()
         )
@@ -401,10 +467,10 @@ with tab4:
         ax.set_ylabel("Contactos por día")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
-        fig_to_streamlit(fig)
+        _fts(fig, st)
 
 with tab5:
-    st.subheader("Descriptive Estadísticas")
+    st.subheader("Estadísticas descriptivas")
 
     daily_per_mandante = (
         df.groupby(["fecha_llamada", "id_mandante"])["countcd"].sum().reset_index()
@@ -413,7 +479,7 @@ with tab5:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.write("**Global Daily Contact Estadísticas:**")
+        st.write("**Estadísticas globales de contactos diarios:**")
         stats_df = pd.DataFrame(
             {
                 "Métrica": [
@@ -464,7 +530,7 @@ with tab5:
         top_dates["fecha_llamada"] = top_dates["fecha_llamada"].dt.strftime("%Y-%m-%d")
         st.dataframe(top_dates, use_container_width=True)
 
-    st.write("**Estadísticas by mandante (daily):**")
+    st.write("**Estadísticas por mandante (diario):**")
     mandante_stats = (
         daily_per_mandante.groupby("id_mandante")["countcd"]
         .agg(
@@ -552,7 +618,7 @@ with tab5:
     ax.set_xticklabels(labels, rotation=45, ha="right")
     ax.set_yticklabels(labels, rotation=0)
     fig.tight_layout()
-    fig_to_streamlit(fig)
+    _fts(fig, st)
 
     st.write("**Promedio de contactos por día de la semana:**")
     daily_dow = (
@@ -560,13 +626,13 @@ with tab5:
     )
     daily_dow["weekday_num"] = daily_dow["fecha_llamada"].dt.dayofweek
     day_names = [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes",
+        "Sábado",
+        "Domingo",
     ]
     dow_agg = (
         daily_dow.groupby("weekday_num")["contacts"]
@@ -596,18 +662,18 @@ with tab5:
         df.groupby(["fecha_llamada", "id_mandante"]).size().reset_index(name="contacts")
     )
     month_names = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
     ]
     daily_month["month_num"] = daily_month["fecha_llamada"].dt.month
     month_agg = (
@@ -635,7 +701,7 @@ with tab5:
 
     if "grupo" in df.columns:
         st.write("---")
-        st.write("**Estadísticas by Group:**")
+        st.write("**Estadísticas por grupo:**")
         daily_grupo = (
             df.groupby(["fecha_llamada", "id_mandante", "grupo"])
             .size()
@@ -665,14 +731,14 @@ with tab5:
         )
 
 with tab6:
-    st.subheader("CD Predicción - Current Month (Seasonal Decomposition)")
+    st.subheader("Predicción CD - Mes actual (descomposición estacional)")
 
     hoy = datetime.now()
-    mes_actual = hoy.strftime("%B %Y")
+    mes_actual = f"{MESES_ESPANOL[hoy.month]} {hoy.year}"
     st.info(f"Mostrando predicción para días hábiles (lun-vie): {mes_actual}")
 
-    with st.spinner("Calculating prediction..."):
-        df_prediccion, estacionalidad, _ = train_and_predict(df)
+    with st.spinner("Calculando predicción..."):
+        df_prediccion, estacionalidad, _ = cached_train_and_predict(df)
 
     if len(df_prediccion) > 0:
         for mandante in df_prediccion["mandante_name"].unique():
@@ -714,19 +780,19 @@ with tab6:
                 color=sns.color_palette("Blues_d", len(df_mandante)),
             )
             ax.set_title(f"CD esperados por día - {mandante} - {mes_actual}")
-            ax.set_xlabel("Date")
-            ax.set_ylabel("Expected CDs")
+            ax.set_xlabel("Fecha")
+            ax.set_ylabel("CD esperados")
             plt.xticks(rotation=45, ha="right")
             fig.tight_layout()
-            fig_to_streamlit(fig)
+            _fts(fig, st)
     else:
         st.warning("No hay suficientes datos para generar la predicción.")
 
 with tab7:
-    st.subheader("Factores estacionales by Mandante")
+    st.subheader("Factores estacionales por mandante")
 
     with st.spinner("Calculando factores estacionales..."):
-        df_prediccion, estacionalidad, _ = train_and_predict(df)
+        df_prediccion, estacionalidad, _ = cached_train_and_predict(df)
 
     if len(df_prediccion) > 0:
         for mandante, est in estacionalidad.items():
@@ -736,7 +802,7 @@ with tab7:
 
             dow_df = pd.DataFrame(
                 {
-                    "Día": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                    "Día": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
                     "Factor": [est["dow_factor"].get(i, 1.0) for i in range(5)],
                 }
             )
@@ -753,7 +819,7 @@ with tab7:
             ax.set_title(f"Factor por día de la semana - {mandante}")
             ax.set_ylabel("Multiplicador")
             fig.tight_layout()
-            fig_to_streamlit(fig)
+            _fts(fig, st)
 
             semana_df = pd.DataFrame(
                 {
@@ -778,21 +844,21 @@ with tab7:
             ax.set_ylabel("Multiplicador")
             ax.set_xticks([1, 2, 3, 4, 5])
             fig.tight_layout()
-            fig_to_streamlit(fig)
+            _fts(fig, st)
 
             nombres_meses = [
-                "January",
-                "February",
-                "March",
-                "April",
-                "May",
-                "June",
-                "July",
-                "August",
-                "September",
-                "October",
-                "November",
-                "December",
+                "Enero",
+                "Febrero",
+                "Marzo",
+                "Abril",
+                "Mayo",
+                "Junio",
+                "Julio",
+                "Agosto",
+                "Septiembre",
+                "Octubre",
+                "Noviembre",
+                "Diciembre",
             ]
             mes_df = pd.DataFrame(
                 {
@@ -817,7 +883,7 @@ with tab7:
             ax.set_ylabel("Multiplicador")
             plt.xticks(rotation=45, ha="right")
             fig.tight_layout()
-            fig_to_streamlit(fig)
+            _fts(fig, st)
 
         if "hora_llamada" in df.columns:
             st.write("---")
@@ -877,18 +943,18 @@ with tab7:
                     ax.set_ylabel("Multiplicador")
                     ax.set_xticks(horas_rango)
                     fig.tight_layout()
-                    fig_to_streamlit(fig)
+                    _fts(fig, st)
     else:
-        st.warning("Not enough data to generate the seasonal factors.")
+        st.warning("No hay suficientes datos para generar los factores estacionales.")
 
 with tab8:
     st.subheader("Descargar objetivos diarios")
 
     hoy = datetime.now()
-    mes_actual = hoy.strftime("%B %Y")
+    mes_actual = f"{MESES_ESPANOL[hoy.month]} {hoy.year}"
 
     with st.spinner("Calculando objetivos..."):
-        df_prediccion, estacionalidad, _ = train_and_predict(df)
+        df_prediccion, estacionalidad, _ = cached_train_and_predict(df)
 
     if len(df_prediccion) > 0:
         global_targets = {}
@@ -900,12 +966,12 @@ with tab8:
         for _, row in df_prediccion.iterrows():
             download_rows.append(
                 {
-                    "day": row["day_of_month"],
-                    "month number": row["month"],
-                    "year": hoy.year,
-                    "portfolio": row["mandante_name"],
-                    "daily target": row["prediction"],
-                    "global target": global_targets[row["mandante_name"]],
+                    "día": row["day_of_month"],
+                    "número de mes": row["month"],
+                    "año": hoy.year,
+                    "cartera": row["mandante_name"],
+                    "objetivo diario": row["prediction"],
+                    "objetivo global": global_targets[row["mandante_name"]],
                 }
             )
 
