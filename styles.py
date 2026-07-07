@@ -10,7 +10,8 @@ def inject_custom_css() -> None:
     /* Hide Streamlit default chrome - more specific selectors */
     [data-testid="stToolbar"],
     footer,
-    #MainMenu {
+    #MainMenu,
+    .stAppHeader {
         visibility: hidden;
         display: none;
     }
