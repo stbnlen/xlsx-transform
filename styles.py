@@ -134,7 +134,7 @@ def render_card(title: str, description: str, icon: str, page: str) -> None:
 
     slug = Path(page).stem
     card_html = f"""
-    <a href="./{slug}" class="dashboard-card-link">
+    <a href="#" onclick="window.top.location.href='./{slug}'; return false;" class="dashboard-card-link">
         <div class="dashboard-card">
             <div>
                 <div class="card-icon">{icon}</div>
