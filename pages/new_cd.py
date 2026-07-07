@@ -97,10 +97,13 @@ filter_mandante = st.sidebar.multiselect(
 )
 
 if "grupo" in df.columns:
+    # Excluir "seguimiento" del filtro de grupo por defecto
+    grupos_disponibles = sorted(df["grupo"].unique())
+    default_grupos = [g for g in grupos_disponibles if g.lower() != "seguimiento"]
     filter_grupo = st.sidebar.multiselect(
         "Grupo",
-        options=sorted(df["grupo"].unique()),
-        default=list(df["grupo"].unique()),
+        options=grupos_disponibles,
+        default=default_grupos,
         key="filter_grupo",
     )
 else:
@@ -338,7 +341,17 @@ with tab3:
     fig.autofmt_xdate()
     _fts(fig, st)
 
-    df["day_of_week"] = df["fecha_llamada"].dt.day_name()
+    # Mapear day_name() de inglés a español
+    day_name_map = {
+        "Monday": "Lunes",
+        "Tuesday": "Martes",
+        "Wednesday": "Miércoles",
+        "Thursday": "Jueves",
+        "Friday": "Viernes",
+        "Saturday": "Sábado",
+        "Sunday": "Domingo",
+    }
+    df["day_of_week"] = df["fecha_llamada"].dt.day_name().map(day_name_map)
     day_order = [
         "Lunes",
         "Martes",
