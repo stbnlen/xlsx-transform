@@ -101,27 +101,35 @@ def inject_custom_css() -> None:
         display: none !important;
     }
 
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #1e293b;
-        border-radius: 12px;
-        padding: 6px;
+    /* Tabs - more robust selectors for production */
+    div[data-testid="stTabs"] {
+        margin-bottom: 2rem;
+    }
+    
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+        gap: 8px !important;
+        background-color: #1e293b !important;
+        border-radius: 12px !important;
+        padding: 6px !important;
+        display: flex !important;
     }
 
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 10px 20px;
-        font-weight: 600;
-        color: #94a3b8;
+    div[data-testid="stTabs"] [data-baseweb="tab"] {
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        font-weight: 600 !important;
+        color: #94a3b8 !important;
         background-color: transparent !important;
+        border: none !important;
+        transition: all 0.2s ease-in-out !important;
     }
 
-    .stTabs [data-baseweb="tab"]:hover {
+    div[data-testid="stTabs"] [data-baseweb="tab"]:hover {
         background-color: #334155 !important;
+        color: #f8fafc !important;
     }
 
-    .stTabs [aria-selected="true"] {
+    div[data-testid="stTabs"] [aria-selected="true"] {
         background-color: #6366f1 !important;
         color: #ffffff !important;
     }
@@ -135,6 +143,27 @@ def inject_custom_css() -> None:
     .stDataFrame {
         border-radius: 12px;
         overflow: hidden;
+    }
+    
+    /* Ensure page links are visible */
+    .stPageLinkContainer {
+        display: block !important;
+        visibility: visible !important;
+        margin-bottom: 1rem;
+    }
+    
+    .stPageLinkContainer a {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        text-decoration: none !important;
+        color: #94a3b8 !important;
+        font-weight: 600 !important;
+        transition: color 0.2s ease-in-out !important;
+    }
+    
+    .stPageLinkContainer a:hover {
+        color: #6366f1 !important;
     }
     </style>
     """
