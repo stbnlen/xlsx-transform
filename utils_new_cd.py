@@ -4,6 +4,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 
 
 def calc_week_of_month(dates: pd.Series) -> pd.Series:
@@ -114,16 +115,18 @@ def create_seasonality_features(df: pd.DataFrame) -> dict:
 
 
 def train_and_predict(df: pd.DataFrame) -> tuple:
-    """Generate predictions for the current month using seasonal factors."""
+    """Generate predictions using Random Forest Regressor."""
     today = datetime.now()
     year = today.year
     month = today.month
     days_in_month = calendar.monthrange(year, month)[1]
 
-    mandante_map = {
-        nombre: idx for idx, nombre in enumerate(sorted(df["id_mandante"].unique()))
-    }
+    # Preparar datos diarios agregados
+    daily = (
+        df.groupby(["id_mandante", "fecha_llamada"]).size().reset_index(name="countcd")
+    )
 
+    # Calcular factores estacionales para la UI (se mantienen para compatibilidad)
     seasonality = create_seasonality_features(df)
 
     WEEKDAY_NAMES = {
@@ -138,43 +141,119 @@ def train_and_predict(df: pd.DataFrame) -> tuple:
 
     prediction_rows = []
 
-    for mandante_name, mandante_id in mandante_map.items():
-        est = seasonality[mandante_name]
-        global_avg = est["global_avg"]
-        dow_factor = est["dow_factor"]
-        week_factor = est["week_factor"]
-        month_factor = est["month_factor"]
-        trend = est["trend_factor"]
+    for mandante_name in sorted(df["id_mandante"].unique()):
+        data = daily[daily["id_mandante"] == mandante_name].copy()
+        data = data.sort_values("fecha_llamada").reset_index(drop=True)
 
+        # Crear features
+        data = create_features(data)
+        data = create_lag_features(data)
+
+        # Seleccionar features más importantes
+        feature_cols = [
+            "day_of_week",
+            "day_of_month",
+            "month",
+            "week_of_month",
+            "is_monday",
+            "is_friday",
+            "is_weekend",
+            "lag_1",
+            "lag_7",
+            "moving_avg_7",
+            "moving_avg_14",
+        ]
+
+        # Filtrar features que existen en el dataframe
+        feature_cols = [c for c in feature_cols if c in data.columns]
+
+        # Eliminar rows con NaN
+        data_clean = data.dropna(subset=feature_cols + ["countcd"])
+
+        # Mínimo de datos para entrenar
+        if len(data_clean) < 30:
+            # Si no hay suficientes datos, usar promedio simple
+            avg_count = data["countcd"].mean()
+            for day in range(1, days_in_month + 1):
+                date = datetime(year, month, day)
+                if date.weekday() >= 5:
+                    continue
+                prediction_rows.append(
+                    {
+                        "date": date,
+                        "day_of_month": day,
+                        "weekday_num": date.weekday(),
+                        "month": month,
+                        "mandante_id": 0,
+                        "mandante_name": mandante_name,
+                        "weekday_name": WEEKDAY_NAMES[date.weekday()],
+                        "prediction": round(avg_count, 1),
+                    }
+                )
+            continue
+
+        # Preparar datos para entrenamiento
+        X = data_clean[feature_cols]
+        y = data_clean["countcd"]
+
+        # Entrenar Random Forest
+        rf = RandomForestRegressor(
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=5,
+            min_samples_leaf=2,
+            random_state=42,
+            n_jobs=-1,
+        )
+        rf.fit(X, y)
+
+        # Predecir para días del mes actual
         for day in range(1, days_in_month + 1):
             date = datetime(year, month, day)
-            weekday = date.weekday()
-
-            if weekday >= 5:
+            if date.weekday() >= 5:  # Saltar fines de semana
                 continue
 
-            first_day_of_month = datetime(year, month, 1)
-            week_of_month = min(
-                (day - 1 + (weekday - first_day_of_month.weekday() + 7) % 7) // 7 + 1, 5
-            )
+            # Crear features para la fecha futura
+            future_row = pd.DataFrame({"fecha_llamada": [date]})
+            future_row = create_features(future_row)
 
-            base = global_avg * trend
-            factor_dow = dow_factor.get(weekday, 1.0)
-            factor_week = week_factor.get(week_of_month, 1.0)
-            factor_month = month_factor.get(month, 1.0)
+            # Para lags y moving averages, usar los últimos valores conocidos
+            last_values = data_clean.tail(14)
 
-            prediction = base * factor_dow * factor_week * factor_month
+            for col in feature_cols:
+                if col.startswith("lag_"):
+                    lag_days = int(col.split("_")[1])
+                    if len(last_values) >= lag_days:
+                        future_row[col] = last_values["countcd"].iloc[-lag_days]
+                    else:
+                        future_row[col] = y.mean()
+                elif col.startswith("moving_avg_"):
+                    window = int(col.split("_")[2])
+                    if len(last_values) >= window:
+                        future_row[col] = last_values["countcd"].tail(window).mean()
+                    else:
+                        future_row[col] = y.mean()
+                elif col not in future_row.columns:
+                    future_row[col] = 0
+
+            # Asegurar que todas las features estén presentes
+            for col in feature_cols:
+                if col not in future_row.columns:
+                    future_row[col] = 0
+
+            X_future = future_row[feature_cols]
+            prediction = rf.predict(X_future)[0]
             prediction = max(prediction, 0)
 
             prediction_rows.append(
                 {
                     "date": date,
                     "day_of_month": day,
-                    "weekday_num": weekday,
+                    "weekday_num": date.weekday(),
                     "month": month,
-                    "mandante_id": mandante_id,
+                    "mandante_id": 0,
                     "mandante_name": mandante_name,
-                    "weekday_name": WEEKDAY_NAMES[weekday],
+                    "weekday_name": WEEKDAY_NAMES[date.weekday()],
                     "prediction": round(prediction, 1),
                 }
             )
