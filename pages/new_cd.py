@@ -11,7 +11,6 @@ from utils_new_cd import (
     fig_to_streamlit as _fts,
     calc_week_of_month,
     train_and_predict,
-    validate_model,
 )
 
 
@@ -19,12 +18,6 @@ from utils_new_cd import (
 def cached_train_and_predict(df_cached):
     """Cached wrapper for train_and_predict to avoid redundant computation."""
     return train_and_predict(df_cached)
-
-
-@st.cache_data(show_spinner=False)
-def cached_validate_model(df_cached):
-    """Cached wrapper for validate_model to avoid redundant computation."""
-    return validate_model(df_cached)
 
 
 setup_page("New CD", "📞")
@@ -306,68 +299,6 @@ with tab2:
         use_container_width=True,
     )
 
-    # Comparación normalizada entre mandantes (índice base 100)
-    st.write("---")
-    st.write("**Comparación normalizada entre mandantes (índice base 100):**")
-    st.caption(
-        "Cada mandante se normaliza a 100 como base para comparar patrones relativos"
-    )
-
-    if len(mandantes) > 1:
-        # Calcular índice normalizado por mandante
-        daily_per_mandante_norm = (
-            df.groupby(["fecha_llamada", "id_mandante"])["countcd"].sum().reset_index()
-        )
-
-        # Calcular promedio por mandante para normalizar
-        mandante_avg = daily_per_mandante_norm.groupby("id_mandante")["countcd"].mean()
-        global_avg = daily_per_mandante_norm["countcd"].mean()
-
-        # Crear índice: (promedio_mandante / promedio_global) * 100
-        mandante_index = (mandante_avg / global_avg * 100).round(1)
-        mandante_index = mandante_index.sort_values(ascending=False)
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        colors = sns.color_palette("viridis", len(mandante_index))
-        bars = ax.barh(mandante_index.index, mandante_index.values, color=colors)
-        ax.axvline(
-            x=100,
-            color="red",
-            linestyle="--",
-            linewidth=2,
-            label="Promedio global (100)",
-        )
-        ax.set_xlabel("Índice normalizado")
-        ax.set_ylabel("Mandante")
-        ax.set_title("Índice de actividad por mandante (base 100)")
-        ax.legend()
-
-        # Agregar valores en las barras
-        for i, (mandante, value) in enumerate(mandante_index.items()):
-            ax.text(value + 1, i, f"{value:.0f}", va="center", fontweight="bold")
-
-        fig.tight_layout()
-        _fts(fig, st)
-
-        st.write("**Tabla de índices normalizados:**")
-        index_df = pd.DataFrame(
-            {
-                "Mandante": mandante_index.index,
-                "Índice": mandante_index.values,
-                "Interpretación": [
-                    (
-                        "Alto volumen"
-                        if v > 120
-                        else "Bajo volumen" if v < 80 else "Volumen promedio"
-                    )
-                    for v in mandante_index.values
-                ],
-            }
-        )
-        st.dataframe(index_df, use_container_width=True)
-    else:
-        st.info("Se necesitan al menos 2 mandantes para la comparación normalizada.")
-
 with tab3:
     st.subheader("Análisis de series temporales")
 
@@ -407,40 +338,6 @@ with tab3:
     ax.set_title("Total diario (todos los mandantes)")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Contactos totales")
-    fig.autofmt_xdate()
-    _fts(fig, st)
-
-    # Moving average de 7 días
-    daily_total_sorted = daily_total.sort_values("fecha_llamada").copy()
-    daily_total_sorted["ma_7"] = (
-        daily_total_sorted["countcd"].rolling(window=7, min_periods=1).mean()
-    )
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.fill_between(
-        daily_total_sorted["fecha_llamada"],
-        daily_total_sorted["countcd"],
-        alpha=0.2,
-        color="steelblue",
-        label="Datos diarios",
-    )
-    ax.plot(
-        daily_total_sorted["fecha_llamada"],
-        daily_total_sorted["countcd"],
-        color="steelblue",
-        alpha=0.5,
-    )
-    ax.plot(
-        daily_total_sorted["fecha_llamada"],
-        daily_total_sorted["ma_7"],
-        color="red",
-        linewidth=2,
-        label="Media móvil (7 días)",
-    )
-    ax.set_title("Total diario con media móvil (7 días)")
-    ax.set_xlabel("Fecha")
-    ax.set_ylabel("Contactos totales")
-    ax.legend()
     fig.autofmt_xdate()
     _fts(fig, st)
 
@@ -567,46 +464,6 @@ with tab4:
         dist_stats.style.format({col: "{:.2f}" for col in numeric_cols}),
         use_container_width=True,
     )
-
-    # Detección de outliers usando IQR
-    st.write("**Detección de outliers (método IQR):**")
-    Q1 = daily_per_mandante["countcd"].quantile(0.25)
-    Q3 = daily_per_mandante["countcd"].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-
-    outliers = daily_per_mandante[
-        (daily_per_mandante["countcd"] < lower_bound)
-        | (daily_per_mandante["countcd"] > upper_bound)
-    ]
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total de registros", len(daily_per_mandante))
-    with col2:
-        st.metric("Outliers detectados", len(outliers))
-    with col3:
-        if len(daily_per_mandante) > 0:
-            pct_outliers = (len(outliers) / len(daily_per_mandante)) * 100
-            st.metric("Porcentaje de outliers", f"{pct_outliers:.1f}%")
-
-    if len(outliers) > 0:
-        st.write(f"Rango normal: [{lower_bound:.1f}, {upper_bound:.1f}]")
-        st.write("**Top 10 outliers más extremos:**")
-        outliers_sorted = outliers.copy()
-        outliers_sorted["desviacion"] = outliers_sorted["countcd"].apply(
-            lambda x: max(abs(x - lower_bound), abs(x - upper_bound))
-        )
-        outliers_sorted = outliers_sorted.sort_values(
-            "desviacion", ascending=False
-        ).head(10)
-        st.dataframe(
-            outliers_sorted[
-                ["id_mandante", "fecha_llamada", "countcd", "desviacion"]
-            ].style.format({"countcd": "{:.0f}", "desviacion": "{:.1f}"}),
-            use_container_width=True,
-        )
 
     if "grupo" in df.columns:
         st.write("---")
@@ -893,25 +750,6 @@ with tab6:
     mes_actual = f"{MESES_ESPANOL[hoy.month]} {hoy.year}"
     st.info(f"Mostrando predicción para días hábiles (lun-vie): {mes_actual}")
 
-    # Métricas de validación del modelo
-    with st.spinner("Validando modelo..."):
-        model_metrics = cached_validate_model(df)
-
-    if model_metrics["n_samples"] > 0:
-        st.subheader("Métricas de calidad del modelo (últimos 30 días)")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("MAE (Error Absoluto Medio)", f"{model_metrics['mae']:.2f}")
-        with col2:
-            st.metric("MAPE (Error Porcentual)", f"{model_metrics['mape']:.1f}%")
-        with col3:
-            st.metric(
-                "RMSE (Raíz Error Cuadrático Medio)", f"{model_metrics['rmse']:.2f}"
-            )
-        st.caption("Menores valores indican mejor precisión del modelo")
-    else:
-        st.warning("No hay suficientes datos históricos para validar el modelo.")
-
     with st.spinner("Calculando predicción..."):
         df_prediccion, estacionalidad, _ = cached_train_and_predict(df)
 
@@ -948,64 +786,15 @@ with tab6:
                 value=f"{total_mandante:,.1f}",
             )
 
-            # Calcular intervalos de confianza basados en variabilidad histórica
-            df_historico_mandante = df[df["id_mandante"] == mandante].copy()
-            df_historico_mandante["day_of_week"] = df_historico_mandante[
-                "fecha_llamada"
-            ].dt.dayofweek
-            daily_historico = (
-                df_historico_mandante.groupby(["fecha_llamada", "day_of_week"])[
-                    "countcd"
-                ]
-                .sum()
-                .reset_index()
-            )
-            std_by_weekday = (
-                daily_historico.groupby("day_of_week")["countcd"].std().fillna(0)
-            )
-
-            # Agregar intervalos de confianza a la predicción (95% = ±1.96 std)
-            df_mandante["std_pred"] = df_mandante["weekday_num"].map(std_by_weekday)
-            df_mandante["lower_ci"] = (
-                df_mandante["prediction"] - 1.96 * df_mandante["std_pred"]
-            ).clip(lower=0)
-            df_mandante["upper_ci"] = (
-                df_mandante["prediction"] + 1.96 * df_mandante["std_pred"]
-            )
-
             fig, ax = plt.subplots(figsize=(12, 5))
             ax.bar(
                 df_mandante["date"],
                 df_mandante["prediction"],
                 color=sns.color_palette("Blues_d", len(df_mandante)),
-                label="Predicción",
-            )
-            ax.fill_between(
-                df_mandante["date"],
-                df_mandante["lower_ci"],
-                df_mandante["upper_ci"],
-                alpha=0.3,
-                color="orange",
-                label="Intervalo de confianza (95%)",
-            )
-            ax.plot(
-                df_mandante["date"],
-                df_mandante["upper_ci"],
-                color="orange",
-                linewidth=1,
-                linestyle="--",
-            )
-            ax.plot(
-                df_mandante["date"],
-                df_mandante["lower_ci"],
-                color="orange",
-                linewidth=1,
-                linestyle="--",
             )
             ax.set_title(f"CD esperados por día - {mandante} - {mes_actual}")
             ax.set_xlabel("Fecha")
             ax.set_ylabel("CD esperados")
-            ax.legend()
             plt.xticks(rotation=45, ha="right")
             fig.tight_layout()
             _fts(fig, st)

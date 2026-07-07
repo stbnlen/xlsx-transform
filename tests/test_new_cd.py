@@ -275,8 +275,7 @@ def test_create_seasonality_features_global_avg():
         }
     )
     result = create_seasonality_features(df)
-    # Ahora usa mediana en lugar de media
-    assert result["A"]["global_avg"] == 2.0
+    assert result["A"]["global_avg"] == 5.0 / 3
 
 
 def test_create_seasonality_features_global_avg_daily():

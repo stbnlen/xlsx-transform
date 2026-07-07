@@ -75,51 +75,32 @@ def create_seasonality_features(df: pd.DataFrame) -> dict:
     for mandante in daily["id_mandante"].unique():
         data = daily[daily["id_mandante"] == mandante].copy()
         data = data.sort_values("fecha_llamada").reset_index(drop=True)
+        data["day_of_week"] = data["fecha_llamada"].dt.dayofweek
+        data["week_of_month"] = calc_week_of_month(data["fecha_llamada"])
+        data["month"] = data["fecha_llamada"].dt.month
+        data["year"] = data["fecha_llamada"].dt.year
 
-        # Detectar y remover outliers usando IQR
-        Q1 = data["countcd"].quantile(0.25)
-        Q3 = data["countcd"].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        data_clean = data[
-            (data["countcd"] >= lower_bound) & (data["countcd"] <= upper_bound)
-        ].copy()
+        global_avg = data["countcd"].mean()
 
-        # Usar mediana en lugar de media (más robusto a outliers)
-        global_avg = data_clean["countcd"].median()
-
-        data_clean["day_of_week"] = data_clean["fecha_llamada"].dt.dayofweek
-        data_clean["week_of_month"] = calc_week_of_month(data_clean["fecha_llamada"])
-        data_clean["month"] = data_clean["fecha_llamada"].dt.month
-        data_clean["year"] = data_clean["fecha_llamada"].dt.year
-
-        # Factores con límites para evitar valores extremos
-        seasonal_dow = data_clean.groupby("day_of_week")["countcd"].median()
+        seasonal_dow = data.groupby("day_of_week")["countcd"].mean()
         dow_factor = {}
         for dow in range(7):
             if dow in seasonal_dow.index:
-                factor = seasonal_dow[dow] / global_avg
-                # Limitar factor entre 0.3 y 3.0
-                dow_factor[dow] = max(0.3, min(3.0, factor))
+                dow_factor[dow] = seasonal_dow[dow] / global_avg
             else:
-                dow_factor[dow] = 1.0
+                dow_factor[dow] = 0.0
 
-        seasonal_week = data_clean.groupby("week_of_month")["countcd"].median()
-        week_factor = (seasonal_week / global_avg).clip(0.3, 3.0)
+        seasonal_week = data.groupby("week_of_month")["countcd"].mean()
+        week_factor = seasonal_week / global_avg
 
-        seasonal_month = data_clean.groupby("month")["countcd"].median()
-        month_factor = (seasonal_month / global_avg).clip(0.3, 3.0)
+        seasonal_month = data.groupby("month")["countcd"].mean()
+        month_factor = seasonal_month / global_avg
 
-        # Trend factor con límites más conservadores
-        monthly_avg = data_clean.groupby(["year", "month"])["countcd"].median()
+        monthly_avg = data.groupby(["year", "month"])["countcd"].mean()
         recent_months = monthly_avg.tail(6)
-        if len(recent_months) > 0:
-            trend_factor = recent_months.median() / global_avg
-            # Limitar trend entre 0.5 y 2.0
-            trend_factor = max(0.5, min(2.0, trend_factor))
-        else:
-            trend_factor = 1.0
+        trend_factor = (
+            recent_months.mean() / global_avg if len(recent_months) > 0 else 1.0
+        )
 
         seasonality[mandante] = {
             "global_avg": global_avg,
@@ -130,81 +111,6 @@ def create_seasonality_features(df: pd.DataFrame) -> dict:
         }
 
     return seasonality
-
-
-def validate_model(df: pd.DataFrame, test_days: int = 30) -> dict:
-    """Validate model using last test_days as test set. Returns MAE, MAPE, RMSE."""
-    daily = (
-        df.groupby(["id_mandante", "fecha_llamada"]).size().reset_index(name="countcd")
-    )
-
-    metrics = {"mae": 0, "mape": 0, "rmse": 0, "n_samples": 0}
-    total_mae = 0
-    total_mape = 0
-    total_rmse = 0
-    n_samples = 0
-
-    for mandante in daily["id_mandante"].unique():
-        data = daily[daily["id_mandante"] == mandante].copy()
-        data = data.sort_values("fecha_llamada").reset_index(drop=True)
-
-        if len(data) < test_days + 60:
-            continue
-
-        train_data = data.iloc[:-test_days]
-        test_data = data.iloc[-test_days:]
-
-        seasonality = create_seasonality_features(train_data)
-        est = seasonality[mandante]
-        global_avg = est["global_avg"]
-        dow_factor = est["dow_factor"]
-        week_factor = est["week_factor"]
-        month_factor = est["month_factor"]
-        trend = est["trend_factor"]
-
-        errors = []
-        percentage_errors = []
-
-        for _, row in test_data.iterrows():
-            date = row["fecha_llamada"]
-            actual = row["countcd"]
-            weekday = date.weekday()
-            week_of_month = int(calc_week_of_month(pd.Series([date])).values[0])
-            month = date.month
-
-            base = global_avg * trend
-            factor_dow = dow_factor.get(weekday, 1.0)
-            factor_week = week_factor.get(week_of_month, 1.0)
-            factor_month = month_factor.get(month, 1.0)
-
-            predicted = base * factor_dow * factor_week * factor_month
-
-            # Limitar predicción: no más de 3x el promedio global
-            max_prediction = global_avg * 3.0
-            predicted = min(predicted, max_prediction)
-            predicted = max(predicted, 0)
-
-            error = abs(actual - predicted)
-            errors.append(error)
-
-            if actual > 0:
-                percentage_errors.append(error / actual)
-
-        if errors:
-            total_mae += sum(errors)
-            total_rmse += sum(e**2 for e in errors)
-            if percentage_errors:
-                total_mape += sum(percentage_errors)
-            n_samples += len(errors)
-
-    if n_samples > 0:
-        metrics["mae"] = total_mae / n_samples
-        metrics["rmse"] = (total_rmse / n_samples) ** 0.5
-        if total_mape > 0:
-            metrics["mape"] = (total_mape / n_samples) * 100
-        metrics["n_samples"] = n_samples
-
-    return metrics
 
 
 def train_and_predict(df: pd.DataFrame) -> tuple:
@@ -258,10 +164,6 @@ def train_and_predict(df: pd.DataFrame) -> tuple:
             factor_month = month_factor.get(month, 1.0)
 
             prediction = base * factor_dow * factor_week * factor_month
-
-            # Limitar predicción: no más de 3x el promedio global
-            max_prediction = global_avg * 3.0
-            prediction = min(prediction, max_prediction)
             prediction = max(prediction, 0)
 
             prediction_rows.append(
