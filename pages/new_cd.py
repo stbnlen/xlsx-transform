@@ -199,9 +199,9 @@ with tab2:
         mandante_grupo = (
             df.groupby(["id_mandante", "grupo"])["countcd"].sum().reset_index()
         )
-        mandante_grupo.columns = ["Mandante", "Group", "Contacts"]
+        mandante_grupo.columns = ["Mandante", "Grupo", "Contactos"]
         mandante_grupo_pivot = mandante_grupo.pivot(
-            index="Mandante", columns="Group", values="Contacts"
+            index="Mandante", columns="Grupo", values="Contactos"
         ).fillna(0)
         st.dataframe(mandante_grupo_pivot, use_container_width=True)
 
@@ -210,7 +210,7 @@ with tab2:
         ax.set_title("Contactos por mandante y grupo")
         ax.set_xlabel("Mandante")
         ax.set_ylabel("Contactos totales")
-        ax.legend(title="Group")
+        ax.legend(title="Grupo")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
         fig_to_streamlit(fig)
@@ -397,7 +397,7 @@ with tab4:
             data=daily_per_grupo, x="grupo", y="countcd", ax=ax, palette="pastel"
         )
         ax.set_title("Diagrama de caja por grupo")
-        ax.set_xlabel("Group")
+        ax.set_xlabel("Grupo")
         ax.set_ylabel("Contactos por día")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
@@ -417,18 +417,18 @@ with tab5:
         stats_df = pd.DataFrame(
             {
                 "Métrica": [
-                    "Mean",
-                    "Median",
-                    "Standard deviation",
-                    "Minimum",
-                    "Maximum",
+                    "Media",
+                    "Mediana",
+                    "Desviación estándar",
+                    "Mínimo",
+                    "Máximo",
                     "Q1 (25%)",
                     "Q3 (75%)",
-                    "IQR",
-                    "Skewness",
-                    "Kurtosis",
+                    "Rango intercuartílico",
+                    "Asimetría",
+                    "Curtosis",
                     "Total",
-                    "Coeff. of Variation",
+                    "Coef. de Variación",
                 ],
                 "Valor": [
                     f"{daily_per_mandante['countcd'].mean():.2f}",
@@ -488,15 +488,15 @@ with tab5:
         "Máx.",
         "Registros",
     ]
-    mandante_stats = mandante_stats.sort_values("Mean", ascending=False)
+    mandante_stats = mandante_stats.sort_values("Media", ascending=False)
     st.dataframe(
         mandante_stats.style.format(
             {
-                "Mean": "{:.2f}",
-                "Median": "{:.2f}",
-                "Std": "{:.2f}",
-                "Min": "{:.0f}",
-                "Max": "{:.0f}",
+                "Media": "{:.2f}",
+                "Mediana": "{:.2f}",
+                "Desv. Est.": "{:.2f}",
+                "Mín.": "{:.0f}",
+                "Máx.": "{:.0f}",
                 "Registros": "{:.0f}",
             }
         ),
@@ -647,17 +647,17 @@ with tab5:
             .reset_index()
         )
         grupo_stats.columns = [
-            "Group",
+            "Grupo",
             "Contactos totales",
-            "Daily Average",
-            "Records",
+            "Promedio diario",
+            "Registros",
         ]
         grupo_stats = grupo_stats.sort_values("Contactos totales", ascending=False)
         st.dataframe(
             grupo_stats.style.format(
                 {
                     "Contactos totales": "{:,.0f}",
-                    "Daily Average": "{:.2f}",
+                    "Promedio diario": "{:.2f}",
                     "Registros": "{:,.0f}",
                 }
             ),
@@ -747,7 +747,7 @@ with tab7:
 
             fig, ax = plt.subplots(figsize=(6, 3))
             ax.bar(
-                dow_df["Day"], dow_df["Factor"], color=sns.color_palette("viridis", 5)
+                dow_df["Día"], dow_df["Factor"], color=sns.color_palette("viridis", 5)
             )
             ax.axhline(y=1.0, color="red", linestyle="--", alpha=0.5)
             ax.set_title(f"Factor por día de la semana - {mandante}")
@@ -757,7 +757,7 @@ with tab7:
 
             semana_df = pd.DataFrame(
                 {
-                    "Week of Month": [1, 2, 3, 4, 5],
+                    "Semana del mes": [1, 2, 3, 4, 5],
                     "Factor": [est["week_factor"].get(i, 1.0) for i in range(1, 6)],
                 }
             )
@@ -768,13 +768,13 @@ with tab7:
 
             fig, ax = plt.subplots(figsize=(6, 3))
             ax.bar(
-                semana_df["Week of Month"],
+                semana_df["Semana del mes"],
                 semana_df["Factor"],
                 color=sns.color_palette("Blues_d", 5),
             )
             ax.axhline(y=1.0, color="red", linestyle="--", alpha=0.5)
             ax.set_title(f"Factor por semana del mes - {mandante}")
-            ax.set_xlabel("Week of Month")
+            ax.set_xlabel("Semana del mes")
             ax.set_ylabel("Multiplicador")
             ax.set_xticks([1, 2, 3, 4, 5])
             fig.tight_layout()
@@ -807,7 +807,7 @@ with tab7:
 
             fig, ax = plt.subplots(figsize=(10, 4))
             ax.bar(
-                mes_df["Month"],
+                mes_df["Mes"],
                 mes_df["Factor"],
                 color=sns.color_palette("Greens_d", 12),
             )
@@ -867,7 +867,7 @@ with tab7:
                 with col2:
                     fig, ax = plt.subplots(figsize=(8, 3))
                     ax.bar(
-                        hora_df["Hour"],
+                        hora_df["Hora"],
                         hora_df["Factor"],
                         color=sns.color_palette("Oranges_d", len(horas_rango)),
                     )
