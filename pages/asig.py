@@ -6,6 +6,9 @@ import streamlit as st
 from pagos_bci import show_bci_view
 from q_banco import show_q_banco_view
 from q_cmr import show_q_cmr_view
+from styles import setup_page
+
+setup_page("Asignaciones", "📋")
 
 
 def process_forum_data(
@@ -229,7 +232,7 @@ def process_single_file(
     return processed_df
 
 
-st.title("Assignments")
+st.title("Asignaciones")
 
 tab1, tab2, tab3, tab4 = st.tabs(["Q_BANCO", "Q_CMR", "FORUM", "BCI"])
 
@@ -245,20 +248,20 @@ with tab3:
     st.header("FORUM")
 
     # First file uploader
-    st.subheader("Castigo (Charge-off)")
+    st.subheader("Castigo")
     uploaded_file1 = st.file_uploader(
-        "Choose first XLSX file", type=["xlsx", "xls"], key="forum_uploader1"
+        "Selecciona el archivo Castigo", type=["xlsx", "xls"], key="forum_uploader1"
     )
 
     # Second file uploader
-    st.subheader("Vigente (Current)")
+    st.subheader("Vigente")
     uploaded_file2 = st.file_uploader(
-        "Choose second XLSX file", type=["xlsx", "xls"], key="forum_uploader2"
+        "Selecciona el archivo Vigente", type=["xlsx", "xls"], key="forum_uploader2"
     )
 
     # Process files when both are uploaded
     if uploaded_file1 is not None and uploaded_file2 is not None:
-        st.success("Both files uploaded successfully!")
+        st.success("Ambos archivos se cargaron correctamente.")
 
         try:
             # Read both Excel files
@@ -266,11 +269,11 @@ with tab3:
             df_vigente = pd.read_excel(uploaded_file2)
 
             # Show previews with type handling to avoid Arrow conversion errors
-            st.write("Preview of Castigo file:")
+            st.write("Vista previa del archivo Castigo:")
             display_castigo = df_castigo.head().astype(str)
             st.dataframe(display_castigo)
 
-            st.write("Preview of Vigente file:")
+            st.write("Vista previa del archivo Vigente:")
             display_vigente = df_vigente.head().astype(str)
             st.dataframe(display_vigente)
 
@@ -280,7 +283,7 @@ with tab3:
             )
 
             # Show the combined result with type handling to avoid Arrow conversion errors
-            st.write("Combined Data (Ready for Download):")
+            st.write("Datos combinados (listos para descargar):")
             display_combined = combined_df.copy()
             for col in display_combined.columns:
                 if display_combined[col].dtype == "object":
@@ -293,34 +296,34 @@ with tab3:
                 combined_df.to_excel(writer, sheet_name="Anexar1", index=False)
             excel_data = output.getvalue()
             st.download_button(
-                label="Download Combined Data as XLSX",
+                label="Descargar datos combinados como XLSX",
                 data=excel_data,
                 file_name="combined_forum_data.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
         except Exception as e:
-            st.error(f"Error processing files: {e}")
+            st.error(f"Error al procesar los archivos: {e}")
             st.info(
-                "Please make sure your files have the required columns: CONTRATO, RUT, NOMBRE CLIENTE, MONTO CASTIGO, FECHA CASTIGO, CARTERA"
+                "Asegúrate de que los archivos tengan las columnas requeridas: CONTRATO, RUT, NOMBRE CLIENTE, MONTO CASTIGO, FECHA CASTIGO, CARTERA"
             )
     elif uploaded_file1 is not None:
-        st.info("Please upload the Vigente file to proceed.")
+        st.info("Carga el archivo Vigente para continuar.")
         try:
             df1 = pd.read_excel(uploaded_file1)
-            st.write("Preview of Castigo file:")
+            st.write("Vista previa del archivo Castigo:")
             st.dataframe(df1.head())
         except Exception as e:
-            st.error(f"Error reading file: {e}")
+            st.error(f"Error al leer el archivo: {e}")
     elif uploaded_file2 is not None:
-        st.info("Please upload the Castigo file to proceed.")
+        st.info("Carga el archivo Castigo para continuar.")
         try:
             df2 = pd.read_excel(uploaded_file2)
-            st.write("Preview of Vigente file:")
+            st.write("Vista previa del archivo Vigente:")
             st.dataframe(df2.head())
         except Exception as e:
-            st.error(f"Error reading file: {e}")
+            st.error(f"Error al leer el archivo: {e}")
     else:
-        st.info("Please upload both Castigo and Vigente files to proceed.")
+        st.info("Carga ambos archivos, Castigo y Vigente, para continuar.")
 with tab4:
     show_bci_view()

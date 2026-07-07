@@ -2,8 +2,11 @@ import streamlit as st
 
 from pagos_bci import show_pagos_bci_view
 from pagos_frm import show_pagos_frm_view
+from styles import setup_page
 
-st.title("Payments")
+setup_page("Pagos", "💰")
+
+st.title("Pagos")
 
 tab1, tab2 = st.tabs(["PAGOS_FRM", "PAGOS BCI"])
 

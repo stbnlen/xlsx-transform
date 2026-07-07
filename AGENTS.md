@@ -57,7 +57,7 @@ isort --profile=black . && black .
 
 - **All code variables, function names, and internal DataFrame columns**: English
 - **Source Excel column names** (matching uploaded data): keep original Spanish names in matching logic
-- **UI strings** (labels, messages, chart titles): English
+- **UI strings** (labels, messages, chart titles): Spanish
 - **Business domain terms** in data (RUT, Castigo, Vigente, etc.): keep as-is in data context
 
 ### Imports
@@ -123,17 +123,22 @@ except Exception as e:
 
 ```
 xlsx-transform/
-├── app.py              # Main Streamlit entry point
+├── .streamlit/
+│   └── config.toml     # Streamlit theme and UI configuration
+├── app.py              # Main Streamlit entry point (dashboard navigation)
+├── styles.py           # Global CSS and page setup helpers
 ├── utils.py            # Shared utility functions (stats, charts)
 ├── utils_new_cd.py     # Utilities for New CD module
 ├── q_banco.py          # Q_BANCO view module
 ├── q_cmr.py            # Q_CMR view module
 ├── pagos_frm.py        # PAGOS_FRM view module (analysis + ML)
-├── pagos_bci.py        # PAGOS BCI and BCI merge views
+├── pagos_bci.py        # Pagos BCI and BCI merge views
 ├── pages/
 │   ├── asig.py         # Asignaciones page (tabs: Q_BANCO, Q_CMR, FORUM, BCI)
 │   ├── pagos.py        # Payments page (tabs: PAGOS_FRM, PAGOS BCI)
-│   └── new_cd.py       # New CD analytics page
+│   ├── new_cd.py       # New CD analytics page
+│   ├── reporte_cae.py  # Reporte CAE page (under construction)
+│   └── compromisos.py  # Compromisos page (under construction)
 ├── tests/
 │   ├── test_app.py
 │   ├── test_utils.py

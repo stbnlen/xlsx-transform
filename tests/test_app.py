@@ -1,13 +1,31 @@
 import os
 
 
-def test_app_tabs():
+def test_app_dashboard():
     with open(os.path.join(os.path.dirname(__file__), "..", "app.py"), "r") as f:
         content = f.read()
 
     assert "st.set_page_config" in content
     assert 'st.title("Excel Transformer")' in content
-    assert "Select a module from the sidebar navigation" in content
+    assert "render_card" in content
+    assert "Asignaciones" in content
+    assert "Pagos" in content
+    assert "New CD" in content
+    assert "Reporte CAE" in content
+    assert "Compromisos" in content
+    assert "Selecciona un módulo para comenzar" in content
+
+
+def test_styles_provides_navigation():
+    styles_path = os.path.join(os.path.dirname(__file__), "..", "styles.py")
+    assert os.path.exists(styles_path), "styles.py should exist"
+
+    with open(styles_path, "r") as f:
+        content = f.read()
+
+    assert "st.page_link" in content
+    assert "inject_custom_css" in content
+    assert "setup_page" in content
 
 
 def test_app_imports():
@@ -36,8 +54,8 @@ def test_asig_page_tabs():
     assert "show_q_cmr_view()" in content
     assert "with tab3:" in content
     assert 'st.header("FORUM")' in content
-    assert 'st.subheader("Castigo (Charge-off)")' in content
-    assert 'st.subheader("Vigente (Current)")' in content
+    assert 'st.subheader("Castigo")' in content
+    assert 'st.subheader("Vigente")' in content
     assert "def process_forum_data(" in content
     assert "def process_single_file(" in content
     assert "with tab4:" in content

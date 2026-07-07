@@ -1,4 +1,4 @@
-streamlit
+streamlit>=1.36.0
 pandas
 openpyxl
 xlrd>=2.0.1
@@ -6,9 +6,6 @@ scipy
 statsmodels
 matplotlib
 seaborn
-xgboost
-lightgbm
-scikit-learn
 xgboost
 lightgbm
 scikit-learn
