@@ -110,12 +110,12 @@ with tab1:
 
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.bar(
-            grupo_df["Group"],
-            grupo_df["Contacts"],
+            grupo_df["Grupo"],
+            grupo_df["Contactos"],
             color=sns.color_palette("Set2", len(grupo_df)),
         )
         ax.set_title("Contactos por grupo")
-        ax.set_xlabel("Group")
+        ax.set_xlabel("Grupo")
         ax.set_ylabel("Contactos totales")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
