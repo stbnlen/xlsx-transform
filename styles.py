@@ -92,6 +92,15 @@ def inject_custom_css() -> None:
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
     }
 
+    /* Headers */
+    h1, h2, h3 {
+        border-bottom: none !important;
+    }
+    
+    h1 a, h2 a, h3 a {
+        display: none !important;
+    }
+
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
@@ -105,6 +114,11 @@ def inject_custom_css() -> None:
         padding: 10px 20px;
         font-weight: 600;
         color: #94a3b8;
+        background-color: transparent !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #334155 !important;
     }
 
     .stTabs [aria-selected="true"] {
