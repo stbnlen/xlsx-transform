@@ -731,7 +731,7 @@ with tab7:
     if len(df_prediccion) > 0:
         for mandante, est in estacionalidad.items():
             st.write(
-                f"**{mandante}** (promedio global: {est['global_avg']:.1f}, tendencia: {est['tendencia_factor']:.2f}x)"
+                f"**{mandante}** (promedio global: {est['global_avg']:.1f}, tendencia: {est['trend_factor']:.2f}x)"
             )
 
             dow_df = pd.DataFrame(
