@@ -113,6 +113,77 @@ def create_seasonality_features(df: pd.DataFrame) -> dict:
     return seasonality
 
 
+def validate_model(df: pd.DataFrame, test_days: int = 30) -> dict:
+    """Validate model using last test_days as test set. Returns MAE, MAPE, RMSE."""
+    daily = (
+        df.groupby(["id_mandante", "fecha_llamada"]).size().reset_index(name="countcd")
+    )
+
+    metrics = {"mae": 0, "mape": 0, "rmse": 0, "n_samples": 0}
+    total_mae = 0
+    total_mape = 0
+    total_rmse = 0
+    n_samples = 0
+
+    for mandante in daily["id_mandante"].unique():
+        data = daily[daily["id_mandante"] == mandante].copy()
+        data = data.sort_values("fecha_llamada").reset_index(drop=True)
+
+        if len(data) < test_days + 60:
+            continue
+
+        train_data = data.iloc[:-test_days]
+        test_data = data.iloc[-test_days:]
+
+        seasonality = create_seasonality_features(train_data)
+        est = seasonality[mandante]
+        global_avg = est["global_avg"]
+        dow_factor = est["dow_factor"]
+        week_factor = est["week_factor"]
+        month_factor = est["month_factor"]
+        trend = est["trend_factor"]
+
+        errors = []
+        percentage_errors = []
+
+        for _, row in test_data.iterrows():
+            date = row["fecha_llamada"]
+            actual = row["countcd"]
+            weekday = date.weekday()
+            week_of_month = int(calc_week_of_month(pd.Series([date])).values[0])
+            month = date.month
+
+            base = global_avg * trend
+            factor_dow = dow_factor.get(weekday, 1.0)
+            factor_week = week_factor.get(week_of_month, 1.0)
+            factor_month = month_factor.get(month, 1.0)
+
+            predicted = base * factor_dow * factor_week * factor_month
+            predicted = max(predicted, 0)
+
+            error = abs(actual - predicted)
+            errors.append(error)
+
+            if actual > 0:
+                percentage_errors.append(error / actual)
+
+        if errors:
+            total_mae += sum(errors)
+            total_rmse += sum(e**2 for e in errors)
+            if percentage_errors:
+                total_mape += sum(percentage_errors)
+            n_samples += len(errors)
+
+    if n_samples > 0:
+        metrics["mae"] = total_mae / n_samples
+        metrics["rmse"] = (total_rmse / n_samples) ** 0.5
+        if total_mape > 0:
+            metrics["mape"] = (total_mape / n_samples) * 100
+        metrics["n_samples"] = n_samples
+
+    return metrics
+
+
 def train_and_predict(df: pd.DataFrame) -> tuple:
     """Generate predictions for the current month using seasonal factors."""
     today = datetime.now()
