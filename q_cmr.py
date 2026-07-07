@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,21 @@ from utils import (
     normalize_column_name,
     validate_required_columns,
 )
+
+MESES_ESPANOL = {
+    1: "enero",
+    2: "febrero",
+    3: "marzo",
+    4: "abril",
+    5: "mayo",
+    6: "junio",
+    7: "julio",
+    8: "agosto",
+    9: "septiembre",
+    10: "octubre",
+    11: "noviembre",
+    12: "diciembre",
+}
 
 
 def show_q_cmr_view() -> None:
@@ -67,9 +83,14 @@ def show_q_cmr_view() -> None:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 filtered_df.to_excel(writer, index=False, sheet_name="Sheet1")
 
+            ahora = datetime.now()
+            mes_actual = MESES_ESPANOL[ahora.month]
+            anio_actual = ahora.year
+            nombre_archivo = f"cmr_{mes_actual}_{anio_actual}.xlsx"
+
             st.download_button(
                 label="Download Filtered Excel",
                 data=output.getvalue(),
-                file_name="q_cmr_filtered.xlsx",
+                file_name=nombre_archivo,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
