@@ -214,7 +214,12 @@ def train_and_predict(df: pd.DataFrame) -> tuple:
                 continue
 
             # Crear features para la fecha futura
-            future_row = pd.DataFrame({"fecha_llamada": [date]})
+            future_row = pd.DataFrame(
+                {
+                    "fecha_llamada": [date],
+                    "id_mandante": [mandante_name],
+                }
+            )
             future_row = create_features(future_row)
 
             # Para lags y moving averages, usar los últimos valores conocidos
