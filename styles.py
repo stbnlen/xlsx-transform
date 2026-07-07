@@ -56,16 +56,6 @@ def inject_custom_css() -> None:
         transform: translateY(-4px);
     }
     
-    .dashboard-card-link {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 10;
-        display: block;
-    }
-    
     .card-icon {
         font-size: 2.5rem;
         margin-bottom: 0.75rem;
@@ -74,8 +64,14 @@ def inject_custom_css() -> None:
     .card-title {
         font-size: 1.25rem;
         font-weight: 700;
-        color: #f8fafc;
+        color: #6366f1;
         margin-bottom: 0.5rem;
+        text-decoration: none;
+        transition: color 0.2s ease-in-out;
+    }
+    
+    .card-title:hover {
+        color: #818cf8;
     }
     
     .card-description {
@@ -138,9 +134,8 @@ def render_card(title: str, description: str, icon: str, page: str) -> None:
     slug = Path(page).stem
     card_html = f"""
     <div class="dashboard-card">
-        <a href="/{slug}" class="dashboard-card-link" target="_top"></a>
         <div class="card-icon">{icon}</div>
-        <div class="card-title">{title}</div>
+        <a href="/{slug}" class="card-title">{title}</a>
         <div class="card-description">{description}</div>
     </div>
     """
