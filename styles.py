@@ -37,7 +37,8 @@ def inject_custom_css() -> None:
     }
 
     /* Dashboard cards */
-    .stVerticalBlock {
+    .dashboard-card {
+        position: relative;
         margin-bottom: 1rem;
         border-radius: 16px;
         border: 1px solid #334155;
@@ -45,49 +46,42 @@ def inject_custom_css() -> None:
         padding: 1.5rem;
         transition: all 0.2s ease-in-out;
         height: 100%;
+        min-height: 180px;
+        overflow: hidden;
     }
     
-    .stVerticalBlock:hover {
+    .dashboard-card:hover {
         border-color: #6366f1;
         box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.25);
         transform: translateY(-4px);
     }
     
-    .stPageLinkContainer {
-        margin: 0 !important;
-        padding: 0 !important;
+    .dashboard-card-link {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
+        display: block;
     }
     
-    .stPageLinkContainer a {
-        text-decoration: none !important;
-        color: #f8fafc !important;
-        font-size: 1.25rem !important;
-        font-weight: 700 !important;
-    }
-    
-    .stCaption {
-        color: #94a3b8 !important;
-        font-size: 0.95rem !important;
-        margin-top: 0.5rem !important;
-    }
-
     .card-icon {
         font-size: 2.5rem;
         margin-bottom: 0.75rem;
     }
-
+    
     .card-title {
         font-size: 1.25rem;
         font-weight: 700;
         color: #f8fafc;
         margin-bottom: 0.5rem;
     }
-
+    
     .card-description {
         font-size: 0.95rem;
         color: #94a3b8;
         line-height: 1.4;
-        margin-bottom: 1rem;
     }
 
     /* Primary button override */
@@ -138,14 +132,19 @@ def inject_custom_css() -> None:
 
 
 def render_card(title: str, description: str, icon: str, page: str) -> None:
-    """Render a clickable dashboard navigation card using Streamlit's native page_link."""
-    with st.container():
-        st.page_link(
-            page,
-            label=f"{icon} {title}",
-            use_container_width=True,
-        )
-        st.caption(description)
+    """Render a clickable dashboard navigation card."""
+    from pathlib import Path
+
+    slug = Path(page).stem
+    card_html = f"""
+    <div class="dashboard-card">
+        <a href="/{slug}" class="dashboard-card-link" target="_top"></a>
+        <div class="card-icon">{icon}</div>
+        <div class="card-title">{title}</div>
+        <div class="card-description">{description}</div>
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
 
 
 def setup_page(title: str, icon: str = "📊") -> None:
