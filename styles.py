@@ -7,12 +7,16 @@ def inject_custom_css() -> None:
     """Inject global custom CSS to override default Streamlit looks."""
     css = """
     <style>
-    /* Hide Streamlit default chrome */
-    [data-testid="stHeader"],
+    /* Hide Streamlit default chrome - more specific selectors */
     [data-testid="stToolbar"],
     footer,
     #MainMenu {
         visibility: hidden;
+        display: none;
+    }
+
+    /* Hide only the deploy button, not the entire header */
+    [data-testid="stHeader"] [data-testid="stDeployButton"] {
         display: none;
     }
 
@@ -130,7 +134,7 @@ def render_card(title: str, description: str, icon: str, page: str) -> None:
 
     slug = Path(page).stem
     card_html = f"""
-    <a href="/{slug}" class="dashboard-card-link" target="_top">
+    <a href="./{slug}" class="dashboard-card-link">
         <div class="dashboard-card">
             <div>
                 <div class="card-icon">{icon}</div>
@@ -152,7 +156,7 @@ def setup_page(title: str, icon: str = "📊") -> None:
         page_title=title,
         page_icon=icon,
         layout="wide",
-        initial_sidebar_state="collapsed",
+        initial_sidebar_state="auto",
     )
     inject_custom_css()
     st.page_link("app.py", label="⬅ Volver al inicio", icon="🏠")

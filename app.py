@@ -6,7 +6,7 @@ st.set_page_config(
     page_title="Excel Transformer",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="auto",
 )
 
 inject_custom_css()
