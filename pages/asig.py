@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,21 @@ from pagos_bci import show_bci_view
 from q_banco import show_q_banco_view
 from q_cmr import show_q_cmr_view
 from styles import setup_page
+
+MESES_ESPANOL = {
+    1: "enero",
+    2: "febrero",
+    3: "marzo",
+    4: "abril",
+    5: "mayo",
+    6: "junio",
+    7: "julio",
+    8: "agosto",
+    9: "septiembre",
+    10: "octubre",
+    11: "noviembre",
+    12: "diciembre",
+}
 
 setup_page("Asignaciones", "📋")
 
@@ -295,10 +311,17 @@ with tab3:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 combined_df.to_excel(writer, sheet_name="Anexar1", index=False)
             excel_data = output.getvalue()
+
+            ahora = datetime.now()
+            dia_actual = ahora.day
+            mes_actual = MESES_ESPANOL[ahora.month]
+            anio_actual = ahora.year
+            nombre_archivo = f"forum_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+
             st.download_button(
                 label="Descargar datos combinados como XLSX",
                 data=excel_data,
-                file_name="combined_forum_data.xlsx",
+                file_name=nombre_archivo,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
