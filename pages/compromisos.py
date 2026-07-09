@@ -16,6 +16,7 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     try:
+        # Leer el archivo - la columna de fecha se parsea automáticamente
         df = pd.read_excel(uploaded_file, dtype=str)
 
         # Eliminar columnas L, M, N, O (posiciones 11, 12, 13, 14)
@@ -59,11 +60,17 @@ if uploaded_file is not None:
         elif proximo_dia.weekday() == 6:
             proximo_dia += timedelta(days=1)
 
-        # Convertir columna de fecha y filtrar
-        df_final["FECHA DE COMPR"] = pd.to_datetime(
-            df_final["FECHA DE COMPR"], errors="coerce", dayfirst=True
+        # Convertir columna de fecha a datetime probando múltiples formatos
+        fecha_col = "FECHA DE COMPR"
+        df_final[fecha_col] = pd.to_datetime(
+            df_final[fecha_col],
+            errors="coerce",
+            format="mixed",
+            dayfirst=True,
         )
-        df_filtrado = df_final[df_final["FECHA DE COMPR"].dt.date == proximo_dia].copy()
+
+        # Filtrar por fecha
+        df_filtrado = df_final[df_final[fecha_col].dt.date == proximo_dia].copy()
 
         st.success("Archivo cargado correctamente")
 
@@ -73,10 +80,18 @@ if uploaded_file is not None:
         st.write(f"Total de columnas: {len(df.columns)}")
 
         st.subheader(f"Compromisos para el {proximo_dia.strftime('%d/%m/%Y')}")
-        st.dataframe(df_filtrado)
-        st.write(
-            f"Total de registros para el {proximo_dia.strftime('%d/%m/%Y')}: {len(df_filtrado)}"
-        )
+        if len(df_filtrado) > 0:
+            st.dataframe(df_filtrado)
+            st.write(
+                f"Total de registros para el {proximo_dia.strftime('%d/%m/%Y')}: {len(df_filtrado)}"
+            )
+        else:
+            st.warning(f"No hay compromisos para el {proximo_dia.strftime('%d/%m/%Y')}")
+            st.write("Fechas disponibles en el archivo:")
+            fechas_unicas = df_final[fecha_col].dropna().dt.date.unique()
+            fechas_ordenadas = sorted(fechas_unicas)
+            for fecha in fechas_ordenadas[:10]:  # Mostrar primeras 10 fechas
+                st.write(f"- {fecha.strftime('%d/%m/%Y')}")
     except Exception as e:
         st.error(f"Error al leer el archivo: {e}")
 else:
