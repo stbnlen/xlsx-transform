@@ -16,6 +16,11 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     try:
         df = pd.read_excel(uploaded_file, dtype=str)
+
+        # Eliminar columnas L, M, N (posiciones 11, 12, 13)
+        columnas_a_eliminar = [11, 12, 13]
+        df = df.drop(df.columns[columnas_a_eliminar], axis=1)
+
         st.success("Archivo cargado correctamente")
         st.subheader("Vista previa de los datos")
         st.dataframe(df.head())
