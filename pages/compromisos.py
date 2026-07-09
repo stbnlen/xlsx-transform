@@ -15,7 +15,7 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     try:
-        df = pd.read_excel(uploaded_file)
+        df = pd.read_excel(uploaded_file, dtype=str)
         st.success("Archivo cargado correctamente")
         st.subheader("Vista previa de los datos")
         st.dataframe(df.head())
