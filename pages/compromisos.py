@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from datetime import datetime, timedelta
 
 from styles import setup_page
 
@@ -30,6 +31,7 @@ if uploaded_file is not None:
             "monto a pago": "Monto",
             "tipo pago": "Tipo_de_Pago",
             "forma de pago": "Modo",
+            "fecha de compromiso": "FECHA DE COMPR",
         }
 
         # Construir diccionario de rename por coincidencia parcial
@@ -47,6 +49,22 @@ if uploaded_file is not None:
         columnas_finales = list(rename_dict.values())
         df_final = df_renombrado[columnas_finales]
 
+        # Calcular próximo día hábil
+        hoy = datetime.now().date()
+        proximo_dia = hoy + timedelta(days=1)
+        # Si cae en sábado (5), saltar al lunes (7)
+        if proximo_dia.weekday() == 5:
+            proximo_dia += timedelta(days=2)
+        # Si cae en domingo (6), saltar al lunes (8)
+        elif proximo_dia.weekday() == 6:
+            proximo_dia += timedelta(days=1)
+
+        # Convertir columna de fecha y filtrar
+        df_final["FECHA DE COMPR"] = pd.to_datetime(
+            df_final["FECHA DE COMPR"], errors="coerce", dayfirst=True
+        )
+        df_filtrado = df_final[df_final["FECHA DE COMPR"].dt.date == proximo_dia].copy()
+
         st.success("Archivo cargado correctamente")
 
         st.subheader("Vista previa de los datos originales")
@@ -54,10 +72,11 @@ if uploaded_file is not None:
         st.write(f"Total de filas: {len(df)}")
         st.write(f"Total de columnas: {len(df.columns)}")
 
-        st.subheader("Dataframe final (solo columnas seleccionadas)")
-        st.dataframe(df_final.head())
-        st.write(f"Total de filas: {len(df_final)}")
-        st.write(f"Total de columnas: {len(df_final.columns)}")
+        st.subheader(f"Compromisos para el {proximo_dia.strftime('%d/%m/%Y')}")
+        st.dataframe(df_filtrado)
+        st.write(
+            f"Total de registros para el {proximo_dia.strftime('%d/%m/%Y')}: {len(df_filtrado)}"
+        )
     except Exception as e:
         st.error(f"Error al leer el archivo: {e}")
 else:
