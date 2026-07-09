@@ -1,3 +1,5 @@
+import io
+
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
@@ -5,6 +7,21 @@ from datetime import datetime, timedelta
 from styles import setup_page
 
 setup_page("Compromisos", "")
+
+MESES_ESPANOL = {
+    1: "ene",
+    2: "feb",
+    3: "mar",
+    4: "abr",
+    5: "may",
+    6: "jun",
+    7: "jul",
+    8: "ago",
+    9: "sep",
+    10: "oct",
+    11: "nov",
+    12: "dic",
+}
 
 st.title("Compromisos")
 
@@ -23,16 +40,16 @@ if uploaded_file is not None:
         columnas_a_eliminar = [11, 12, 13, 14]
         df = df.drop(df.columns[columnas_a_eliminar], axis=1)
 
-        # Mapeo de columnas (clave: inicio del nombre en minúsculas, valor: nombre final)
+        # Mapeo de columnas (clave: inicio del nombre en minúsculas, valor: nombre final exacto)
         mapeo_columnas = {
             "nombre empresa": "EMPRESA",
             "cobra": "Sigla_Cobra",
-            "rut clte": "Rut_cliente",
-            "operacion": "Operación",
-            "monto a pago": "Monto",
-            "tipo pago": "Tipo_de_Pago",
-            "forma de pago": "Modo",
-            "fecha de compromiso": "FECHA DE COMPR",
+            "rut clte": "  Rut_Cliente",
+            "operacion": "Operación ",
+            "monto a pago": "Monto  ",
+            "tipo pago": "   Tipo_de_Pago ",
+            "forma de pago": "Modo : presencial/boton de pago ",
+            "fecha de compromiso": "FECHA DE COMPR.",
         }
 
         # Construir diccionario de rename por coincidencia parcial
@@ -60,8 +77,8 @@ if uploaded_file is not None:
         elif proximo_dia.weekday() == 6:
             proximo_dia += timedelta(days=1)
 
-        # La columna FECHA DE COMPR ya viene como datetime64[ns]
-        fecha_col = "FECHA DE COMPR"
+        # La columna FECHA DE COMPR. ya viene como datetime64[ns]
+        fecha_col = "FECHA DE COMPR."
 
         # Filtrar por fecha
         df_filtrado = df_final[df_final[fecha_col].dt.date == proximo_dia].copy()
@@ -78,6 +95,24 @@ if uploaded_file is not None:
             st.dataframe(df_filtrado)
             st.write(
                 f"Total de registros para el {proximo_dia.strftime('%d/%m/%Y')}: {len(df_filtrado)}"
+            )
+
+            # Botón de descarga
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_filtrado.to_excel(writer, index=False, sheet_name="Hoja1")
+            excel_data = output.getvalue()
+
+            dia_actual = proximo_dia.day
+            mes_actual = MESES_ESPANOL[proximo_dia.month]
+            anio_actual = proximo_dia.year
+            nombre_archivo = f"compromisos_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+
+            st.download_button(
+                label="Descargar archivo de compromisos",
+                data=excel_data,
+                file_name=nombre_archivo,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
         else:
             st.warning(f"No hay compromisos para el {proximo_dia.strftime('%d/%m/%Y')}")
