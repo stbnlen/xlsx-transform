@@ -21,11 +21,37 @@ if uploaded_file is not None:
         columnas_a_eliminar = [11, 12, 13, 14]
         df = df.drop(df.columns[columnas_a_eliminar], axis=1)
 
+        # Mapeo de columnas (clave: inicio del nombre en minúsculas, valor: nombre final)
+        mapeo_columnas = {
+            "nombre empresa": "EMPRESA",
+            "cobra": "Sigla_Cobra",
+            "rut clte": "Rut_cliente",
+            "operacion": "Operación",
+            "monto a pago": "Monto",
+            "tipo pago": "Tipo_de_Pago",
+            "forma de pago": "Modo",
+        }
+
+        # Construir diccionario de rename por coincidencia parcial
+        rename_dict = {}
+        for col in df.columns:
+            col_lower = col.strip().lower()
+            for clave, nuevo_nombre in mapeo_columnas.items():
+                if col_lower.startswith(clave):
+                    rename_dict[col] = nuevo_nombre
+                    break
+
+        df_renombrado = df.rename(columns=rename_dict)
+
         st.success("Archivo cargado correctamente")
-        st.subheader("Vista previa de los datos")
+
+        st.subheader("Vista previa de los datos originales")
         st.dataframe(df.head())
         st.write(f"Total de filas: {len(df)}")
         st.write(f"Total de columnas: {len(df.columns)}")
+
+        st.subheader("Vista previa con columnas renombradas")
+        st.dataframe(df_renombrado.head())
     except Exception as e:
         st.error(f"Error al leer el archivo: {e}")
 else:
