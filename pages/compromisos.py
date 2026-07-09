@@ -43,6 +43,10 @@ if uploaded_file is not None:
 
         df_renombrado = df.rename(columns=rename_dict)
 
+        # Filtrar solo las columnas mapeadas
+        columnas_finales = list(rename_dict.values())
+        df_final = df_renombrado[columnas_finales]
+
         st.success("Archivo cargado correctamente")
 
         st.subheader("Vista previa de los datos originales")
@@ -50,8 +54,10 @@ if uploaded_file is not None:
         st.write(f"Total de filas: {len(df)}")
         st.write(f"Total de columnas: {len(df.columns)}")
 
-        st.subheader("Vista previa con columnas renombradas")
-        st.dataframe(df_renombrado.head())
+        st.subheader("Dataframe final (solo columnas seleccionadas)")
+        st.dataframe(df_final.head())
+        st.write(f"Total de filas: {len(df_final)}")
+        st.write(f"Total de columnas: {len(df_final.columns)}")
     except Exception as e:
         st.error(f"Error al leer el archivo: {e}")
 else:
