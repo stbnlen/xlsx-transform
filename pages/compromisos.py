@@ -63,8 +63,11 @@ if uploaded_file is not None:
 
         df_renombrado = df.rename(columns=rename_dict)
 
-        # Filtrar solo las columnas mapeadas
-        columnas_finales = list(rename_dict.values())
+        # Filtrar solo las columnas mapeadas, con FECHA DE COMPR. al final
+        columnas_finales = [
+            col for col in rename_dict.values() if col != "FECHA DE COMPR."
+        ]
+        columnas_finales.append("FECHA DE COMPR.")
         df_final = df_renombrado[columnas_finales]
 
         # Calcular próximo día hábil
@@ -101,6 +104,37 @@ if uploaded_file is not None:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_filtrado.to_excel(writer, index=False, sheet_name="Hoja1")
+
+                # Aplicar formato a los encabezados
+                from openpyxl.styles import Font, PatternFill, Alignment
+
+                worksheet = writer.sheets["Hoja1"]
+
+                # Formato para encabezados: fondo rojo, letras blancas, negrita, Calibri 10
+                header_fill = PatternFill(
+                    start_color="FF0000", end_color="FF0000", fill_type="solid"
+                )
+                header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+
+                # Aplicar formato a la primera fila (encabezados)
+                for cell in worksheet[1]:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+                # Ajustar ancho de columnas
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except Exception:
+                            pass
+                    adjusted_width = min(max_length + 2, 30)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+
             excel_data = output.getvalue()
 
             dia_actual = proximo_dia.day
