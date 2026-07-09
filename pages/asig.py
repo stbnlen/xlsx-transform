@@ -10,18 +10,18 @@ from q_cmr import show_q_cmr_view
 from styles import setup_page
 
 MESES_ESPANOL = {
-    1: "enero",
-    2: "febrero",
-    3: "marzo",
-    4: "abril",
-    5: "mayo",
-    6: "junio",
-    7: "julio",
-    8: "agosto",
-    9: "septiembre",
-    10: "octubre",
-    11: "noviembre",
-    12: "diciembre",
+    1: "ene",
+    2: "feb",
+    3: "mar",
+    4: "abr",
+    5: "may",
+    6: "jun",
+    7: "jul",
+    8: "ago",
+    9: "sep",
+    10: "oct",
+    11: "nov",
+    12: "dic",
 }
 
 setup_page("Asignaciones", "📋")
@@ -316,7 +316,7 @@ with tab3:
             dia_actual = ahora.day
             mes_actual = MESES_ESPANOL[ahora.month]
             anio_actual = ahora.year
-            nombre_archivo = f"forum_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+            nombre_archivo = f"frm_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
 
             st.download_button(
                 label="Descargar datos combinados como XLSX",
