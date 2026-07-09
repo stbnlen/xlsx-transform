@@ -165,6 +165,9 @@ if uploaded_file is not None:
                         col_tipo_pago = idx
                     elif "modo" in col_name:
                         col_modo = idx
+                        # Aplicar formato especial al encabezado de Modo
+                        cell.fill = modo_fill
+                        cell.font = modo_font
                     elif "fecha" in col_name:
                         col_fecha = idx
 
@@ -185,11 +188,6 @@ if uploaded_file is not None:
                         # Formatear columna Tipo_de_Pago: negrita y rojo
                         if col_tipo_pago and cell.column == col_tipo_pago:
                             cell.font = tipo_pago_font
-
-                        # Formatear columna Modo: fondo celeste, negrita, negro
-                        if col_modo and cell.column == col_modo:
-                            cell.font = modo_font
-                            cell.fill = modo_fill
 
                         # Formatear fecha sin hora
                         if col_fecha and cell.column == col_fecha:
