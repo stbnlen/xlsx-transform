@@ -60,14 +60,37 @@ if uploaded_file is not None:
         elif proximo_dia.weekday() == 6:
             proximo_dia += timedelta(days=1)
 
-        # Convertir columna de fecha a datetime probando múltiples formatos
+        # Convertir columna de fecha a datetime
+        # Las fechas de Excel pueden venir como números seriales (ej: 45843) o como strings
         fecha_col = "FECHA DE COMPR"
-        df_final[fecha_col] = pd.to_datetime(
-            df_final[fecha_col],
-            errors="coerce",
-            format="mixed",
-            dayfirst=True,
-        )
+
+        # Intentar convertir como número serial de Excel
+        try:
+            # Convertir a numérico, si falla se queda como string
+            df_final[fecha_col] = pd.to_numeric(df_final[fecha_col], errors="ignore")
+
+            # Si es numérico, convertir desde serial de Excel
+            if pd.api.types.is_numeric_dtype(df_final[fecha_col]):
+                # Excel serial date: días desde 1899-12-30
+                df_final[fecha_col] = pd.to_datetime(
+                    df_final[fecha_col], unit="D", origin="1899-12-30", errors="coerce"
+                )
+            else:
+                # Si es string, convertir como fecha
+                df_final[fecha_col] = pd.to_datetime(
+                    df_final[fecha_col],
+                    errors="coerce",
+                    format="mixed",
+                    dayfirst=True,
+                )
+        except Exception:
+            # Fallback: intentar como string de fecha
+            df_final[fecha_col] = pd.to_datetime(
+                df_final[fecha_col],
+                errors="coerce",
+                format="mixed",
+                dayfirst=True,
+            )
 
         # Filtrar por fecha
         df_filtrado = df_final[df_final[fecha_col].dt.date == proximo_dia].copy()
