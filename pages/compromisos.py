@@ -125,11 +125,11 @@ if uploaded_file is not None:
 
                 # Fuente para Tipo_de_Pago: negrita y rojo
                 tipo_pago_font = Font(
-                    name="Calibri", size=10, bold=True, color="FF0000"
+                    name="Aptos Narrow", size=11, bold=True, color="FF0000"
                 )
 
                 # Fuente normal para datos
-                data_font = Font(name="Calibri", size=10)
+                data_font = Font(name="Aptos Narrow", size=11)
 
                 # Aplicar formato a la primera fila (encabezados)
                 for cell in worksheet[1]:
@@ -140,6 +140,7 @@ if uploaded_file is not None:
 
                 # Encontrar índice de columnas especiales
                 col_operacion = None
+                col_monto = None
                 col_tipo_pago = None
                 col_fecha = None
 
@@ -147,6 +148,8 @@ if uploaded_file is not None:
                     col_name = cell.value.strip().lower() if cell.value else ""
                     if "operación" in col_name:
                         col_operacion = idx
+                    elif "monto" in col_name:
+                        col_monto = idx
                     elif "tipo_de_pago" in col_name:
                         col_tipo_pago = idx
                     elif "fecha" in col_name:
@@ -158,8 +161,12 @@ if uploaded_file is not None:
                         cell.font = data_font
                         cell.border = thin_border
 
-                        # Formatear columna Operación como número
+                        # Formatear columna Operación como número sin separador de miles
                         if col_operacion and cell.column == col_operacion:
+                            cell.number_format = "0"
+
+                        # Formatear columna Monto con separador de miles
+                        if col_monto and cell.column == col_monto:
                             cell.number_format = "#,##0"
 
                         # Formatear columna Tipo_de_Pago: negrita y rojo
