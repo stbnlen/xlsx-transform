@@ -128,6 +128,16 @@ if uploaded_file is not None:
                     name="Aptos Narrow", size=11, bold=True, color="FF0000"
                 )
 
+                # Fuente para Modo: negrita y negro
+                modo_font = Font(
+                    name="Aptos Narrow", size=11, bold=True, color="000000"
+                )
+
+                # Fondo celeste para Modo
+                modo_fill = PatternFill(
+                    start_color="CCFFFF", end_color="CCFFFF", fill_type="solid"
+                )
+
                 # Fuente normal para datos
                 data_font = Font(name="Aptos Narrow", size=11)
 
@@ -142,6 +152,7 @@ if uploaded_file is not None:
                 col_operacion = None
                 col_monto = None
                 col_tipo_pago = None
+                col_modo = None
                 col_fecha = None
 
                 for idx, cell in enumerate(worksheet[1], 1):
@@ -152,6 +163,8 @@ if uploaded_file is not None:
                         col_monto = idx
                     elif "tipo_de_pago" in col_name:
                         col_tipo_pago = idx
+                    elif "modo" in col_name:
+                        col_modo = idx
                     elif "fecha" in col_name:
                         col_fecha = idx
 
@@ -172,6 +185,11 @@ if uploaded_file is not None:
                         # Formatear columna Tipo_de_Pago: negrita y rojo
                         if col_tipo_pago and cell.column == col_tipo_pago:
                             cell.font = tipo_pago_font
+
+                        # Formatear columna Modo: fondo celeste, negrita, negro
+                        if col_modo and cell.column == col_modo:
+                            cell.font = modo_font
+                            cell.fill = modo_fill
 
                         # Formatear fecha sin hora
                         if col_fecha and cell.column == col_fecha:
