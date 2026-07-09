@@ -105,8 +105,7 @@ if uploaded_file is not None:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_filtrado.to_excel(writer, index=False, sheet_name="Hoja1")
 
-                # Aplicar formato a los encabezados
-                from openpyxl.styles import Font, PatternFill, Alignment
+                from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
                 worksheet = writer.sheets["Hoja1"]
 
@@ -116,11 +115,60 @@ if uploaded_file is not None:
                 )
                 header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
 
+                # Bordes para todas las celdas
+                thin_border = Border(
+                    left=Side(style="thin"),
+                    right=Side(style="thin"),
+                    top=Side(style="thin"),
+                    bottom=Side(style="thin"),
+                )
+
+                # Fuente para Tipo_de_Pago: negrita y rojo
+                tipo_pago_font = Font(
+                    name="Calibri", size=10, bold=True, color="FF0000"
+                )
+
+                # Fuente normal para datos
+                data_font = Font(name="Calibri", size=10)
+
                 # Aplicar formato a la primera fila (encabezados)
                 for cell in worksheet[1]:
                     cell.fill = header_fill
                     cell.font = header_font
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.border = thin_border
+
+                # Encontrar índice de columnas especiales
+                col_operacion = None
+                col_tipo_pago = None
+                col_fecha = None
+
+                for idx, cell in enumerate(worksheet[1], 1):
+                    col_name = cell.value.strip().lower() if cell.value else ""
+                    if "operación" in col_name:
+                        col_operacion = idx
+                    elif "tipo_de_pago" in col_name:
+                        col_tipo_pago = idx
+                    elif "fecha" in col_name:
+                        col_fecha = idx
+
+                # Aplicar formato a las filas de datos
+                for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
+                    for cell in row:
+                        cell.font = data_font
+                        cell.border = thin_border
+
+                        # Formatear columna Operación como número
+                        if col_operacion and cell.column == col_operacion:
+                            cell.number_format = "#,##0"
+
+                        # Formatear columna Tipo_de_Pago: negrita y rojo
+                        if col_tipo_pago and cell.column == col_tipo_pago:
+                            cell.font = tipo_pago_font
+
+                        # Formatear fecha sin hora
+                        if col_fecha and cell.column == col_fecha:
+                            cell.number_format = "DD/MM/YYYY"
 
                 # Ajustar ancho de columnas
                 for column in worksheet.columns:
