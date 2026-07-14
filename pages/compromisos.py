@@ -148,8 +148,8 @@ if uploaded_file is not None:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     cell.border = thin_border
 
-                # Alto de fila de encabezados: 36 píxeles
-                worksheet.row_dimensions[1].height = 36
+                # Alto de fila de encabezados
+                worksheet.row_dimensions[1].height = 21.60
 
                 # Encontrar índice de columnas especiales
                 col_operacion = None
