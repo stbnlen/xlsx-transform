@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,21 @@ from utils import (
     normalize_column_name,
     validate_required_columns,
 )
+
+MESES_ESPANOL = {
+    1: "ene",
+    2: "feb",
+    3: "mar",
+    4: "abr",
+    5: "may",
+    6: "jun",
+    7: "jul",
+    8: "ago",
+    9: "sep",
+    10: "oct",
+    11: "nov",
+    12: "dic",
+}
 
 
 def show_q_banco_view() -> None:
@@ -63,9 +79,16 @@ def show_q_banco_view() -> None:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 filtered_df.to_excel(writer, index=False, sheet_name="Sheet1")
 
+            # Generar nombre de archivo con formato BFA_{dia}_{mes}_{año}
+            ahora = datetime.now()
+            dia_actual = ahora.day
+            mes_actual = MESES_ESPANOL[ahora.month]
+            anio_actual = ahora.year
+            nombre_archivo = f"BFA_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+
             st.download_button(
                 label="Download Filtered Excel",
                 data=output.getvalue(),
-                file_name="q_banco_filtered.xlsx",
+                file_name=nombre_archivo,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
