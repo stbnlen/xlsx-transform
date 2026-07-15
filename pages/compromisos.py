@@ -133,6 +133,11 @@ if uploaded_file is not None:
                     name="Aptos Narrow", size=11, bold=True, color="000000"
                 )
 
+                # Fuente para Fecha: negrita y rojo
+                fecha_font = Font(
+                    name="Aptos Narrow", size=11, bold=True, color="FF0000"
+                )
+
                 # Fondo celeste para Modo
                 modo_fill = PatternFill(
                     start_color="CCFFFF", end_color="CCFFFF", fill_type="solid"
@@ -194,7 +199,8 @@ if uploaded_file is not None:
 
                         # Formatear fecha sin hora
                         if col_fecha and cell.column == col_fecha:
-                            cell.number_format = "DD/MM/YYYY"
+                            cell.number_format = "d-mmm"
+                            cell.font = fecha_font
 
                 # Ajustar ancho de columnas
                 for column in worksheet.columns:
