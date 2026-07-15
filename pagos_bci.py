@@ -1,7 +1,23 @@
 import io
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+
+MESES_ESPANOL = {
+    1: "ene",
+    2: "feb",
+    3: "mar",
+    4: "abr",
+    5: "may",
+    6: "jun",
+    7: "jul",
+    8: "ago",
+    9: "sep",
+    10: "oct",
+    11: "nov",
+    12: "dic",
+}
 
 
 def show_pagos_bci_view() -> None:
@@ -111,10 +127,17 @@ def show_bci_view() -> None:
             df_result.to_excel(writer, index=False)
         output.seek(0)
 
+        # Generar nombre de archivo con formato BCI_{dia}_{mes}_{año}
+        ahora = datetime.now()
+        dia_actual = ahora.day
+        mes_actual = MESES_ESPANOL[ahora.month]
+        anio_actual = ahora.year
+        nombre_archivo = f"BCI_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+
         st.download_button(
             label="Download Merged Excel",
             data=output.getvalue(),
-            file_name="bci_merged.xlsx",
+            file_name=nombre_archivo,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     else:

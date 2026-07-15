@@ -23,6 +23,51 @@ MESES_ESPANOL = {
     12: "dic",
 }
 
+# Feriados de Chile (mes, día) - se aplican a cualquier año
+FERIADOS_CHILE = [
+    (1, 1),  # Año Nuevo
+    (4, 3),  # Viernes Santo
+    (4, 4),  # Sábado Santo
+    (5, 1),  # Día Nacional del Trabajo
+    (5, 21),  # Día de las Glorias Navales
+    (6, 21),  # Día Nacional de los Pueblos Indígenas
+    (6, 29),  # San Pedro y San Pablo
+    (7, 16),  # Día de la Virgen del Carmen
+    (8, 15),  # Asunción de la Virgen
+    (9, 18),  # Independencia Nacional
+    (9, 19),  # Día de las Glorias del Ejército
+    (10, 12),  # Encuentro de Dos Mundos
+    (10, 31),  # Día de las Iglesias Evangélicas y Protestantes
+    (11, 1),  # Día de Todos los Santos
+    (12, 8),  # Inmaculada Concepción
+    (12, 25),  # Navidad
+]
+
+
+def es_dia_habil(fecha: datetime.date) -> bool:
+    """Verifica si una fecha es día hábil (no fin de semana ni feriado)."""
+    # Verificar si es fin de semana
+    if fecha.weekday() >= 5:  # 5=sábado, 6=domingo
+        return False
+
+    # Verificar si es feriado
+    if (fecha.month, fecha.day) in FERIADOS_CHILE:
+        return False
+
+    return True
+
+
+def obtener_proximo_dia_habil(fecha_inicio: datetime.date) -> datetime.date:
+    """Obtiene el próximo día hábil desde una fecha dada."""
+    proximo_dia = fecha_inicio + timedelta(days=1)
+
+    # Avanzar hasta encontrar un día hábil
+    while not es_dia_habil(proximo_dia):
+        proximo_dia += timedelta(days=1)
+
+    return proximo_dia
+
+
 st.title("Compromisos")
 
 uploaded_file = st.file_uploader(
@@ -70,15 +115,9 @@ if uploaded_file is not None:
         columnas_finales.append("FECHA DE COMPR.")
         df_final = df_renombrado[columnas_finales]
 
-        # Calcular próximo día hábil
+        # Calcular próximo día hábil (considera fines de semana y feriados)
         hoy = datetime.now().date()
-        proximo_dia = hoy + timedelta(days=1)
-        # Si cae en sábado (5), saltar al lunes (7)
-        if proximo_dia.weekday() == 5:
-            proximo_dia += timedelta(days=2)
-        # Si cae en domingo (6), saltar al lunes (8)
-        elif proximo_dia.weekday() == 6:
-            proximo_dia += timedelta(days=1)
+        proximo_dia = obtener_proximo_dia_habil(hoy)
 
         # La columna FECHA DE COMPR. ya viene como datetime64[ns]
         fecha_col = "FECHA DE COMPR."

@@ -87,7 +87,7 @@ def show_q_cmr_view() -> None:
             dia_actual = ahora.day
             mes_actual = MESES_ESPANOL[ahora.month]
             anio_actual = ahora.year
-            nombre_archivo = f"cmr_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+            nombre_archivo = f"CMR_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
 
             st.download_button(
                 label="Download Filtered Excel",
