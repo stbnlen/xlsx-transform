@@ -201,6 +201,9 @@ if uploaded_file is not None:
                         if col_fecha and cell.column == col_fecha:
                             cell.number_format = "d-mmm"
                             cell.font = fecha_font
+                            cell.alignment = Alignment(
+                                horizontal="center", vertical="center"
+                            )
 
                 # Ajustar ancho de columnas
                 for column in worksheet.columns:
