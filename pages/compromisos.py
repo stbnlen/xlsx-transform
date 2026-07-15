@@ -103,11 +103,11 @@ if uploaded_file is not None:
             # Botón de descarga
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_filtrado.to_excel(writer, index=False, sheet_name="Hoja1")
+                df_filtrado.to_excel(writer, index=False, sheet_name="DEMO")
 
                 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-                worksheet = writer.sheets["Hoja1"]
+                worksheet = writer.sheets["DEMO"]
 
                 # Formato para encabezados: fondo rojo, letras blancas, negrita, Calibri 10
                 header_fill = PatternFill(
@@ -189,9 +189,12 @@ if uploaded_file is not None:
                         if col_operacion and cell.column == col_operacion:
                             cell.number_format = "0"
 
-                        # Formatear columna Monto con separador de miles
+                        # Formatear columna Monto con separador de miles y alineación izquierda
                         if col_monto and cell.column == col_monto:
                             cell.number_format = "#,##0"
+                            cell.alignment = Alignment(
+                                horizontal="left", vertical="center"
+                            )
 
                         # Formatear columna Tipo_de_Pago: negrita y rojo
                         if col_tipo_pago and cell.column == col_tipo_pago:
@@ -223,7 +226,7 @@ if uploaded_file is not None:
             dia_actual = proximo_dia.day
             mes_actual = MESES_ESPANOL[proximo_dia.month]
             anio_actual = proximo_dia.year
-            nombre_archivo = f"compromisos_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+            nombre_archivo = f"INGRESO DE COMPROMISOS DIARIOS {proximo_dia.strftime('%d-%m-%Y')}.xlsx"
 
             st.download_button(
                 label="Descargar archivo de compromisos",
