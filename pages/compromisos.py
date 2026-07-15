@@ -216,14 +216,14 @@ if uploaded_file is not None:
 
                 # Anchos de columnas fijos
                 anchos_columnas = {
-                    1: 10.78,
-                    2: 10.78,
-                    3: 10.78,
-                    4: 12.22,
-                    5: 23.56,
-                    6: 13.11,
-                    7: 27.22,
-                    8: 15.00,
+                    "A": 11.00,
+                    "B": 11.00,
+                    "C": 11.00,
+                    "D": 12.22,
+                    "E": 23.56,
+                    "F": 13.11,
+                    "G": 27.22,
+                    "H": 15.00,
                 }
 
                 for col_letter, width in anchos_columnas.items():
