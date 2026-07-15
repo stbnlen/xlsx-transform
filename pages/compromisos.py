@@ -185,6 +185,12 @@ if uploaded_file is not None:
                         cell.font = data_font
                         cell.border = thin_border
 
+                        # Columna A (EMPRESA): alinear datos a la derecha
+                        if cell.column == 1:
+                            cell.alignment = Alignment(
+                                horizontal="right", vertical="center"
+                            )
+
                         # Formatear columna Operación como número sin separador de miles
                         if col_operacion and cell.column == col_operacion:
                             cell.number_format = "0"
