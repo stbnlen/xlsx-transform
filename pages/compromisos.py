@@ -208,18 +208,20 @@ if uploaded_file is not None:
                                 horizontal="center", vertical="center"
                             )
 
-                # Ajustar ancho de columnas
-                for column in worksheet.columns:
-                    max_length = 0
-                    column_letter = column[0].column_letter
-                    for cell in column:
-                        try:
-                            if len(str(cell.value)) > max_length:
-                                max_length = len(str(cell.value))
-                        except Exception:
-                            pass
-                    adjusted_width = min(max_length + 2, 30)
-                    worksheet.column_dimensions[column_letter].width = adjusted_width
+                # Anchos de columnas fijos
+                anchos_columnas = {
+                    "A": 10.78,
+                    "B": 10.78,
+                    "C": 10.78,
+                    "D": 12.22,
+                    "E": 23.56,
+                    "F": 13.11,
+                    "G": 27.22,
+                    "H": 15.00,
+                }
+
+                for col_letter, width in anchos_columnas.items():
+                    worksheet.column_dimensions[col_letter].width = width
 
             excel_data = output.getvalue()
 
