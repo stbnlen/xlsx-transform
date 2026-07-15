@@ -216,9 +216,9 @@ if uploaded_file is not None:
 
                 # Anchos de columnas fijos
                 anchos_columnas = {
-                    "A": 11.00,
-                    "B": 11.00,
-                    "C": 11.00,
+                    "A": 11.78,
+                    "B": 11.78,
+                    "C": 11.78,
                     "D": 12.22,
                     "E": 23.56,
                     "F": 13.11,
