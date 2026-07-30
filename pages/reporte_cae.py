@@ -1,3 +1,5 @@
+import io
+
 import pandas as pd
 import streamlit as st
 
@@ -47,6 +49,19 @@ if file_anterior is not None and file_actual is not None:
     keys_anterior = set(df_anterior[key_anterior_col].astype(str))
     key_actual_col = df_actual.columns[0]
     df_nuevos = df_actual[~df_actual[key_actual_col].astype(str).isin(keys_anterior)]
+    df_nuevos = df_nuevos.drop(columns=[key_actual_col])
     st.subheader("Registros nuevos en reporte actual")
     st.write(f"Total registros nuevos: {len(df_nuevos)}")
     st.dataframe(df_nuevos.head())
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_nuevos.to_excel(
+            writer, sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS", index=False
+        )
+    st.download_button(
+        label="Descargar registros nuevos",
+        data=output.getvalue(),
+        file_name="registros_nuevos_cae.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
