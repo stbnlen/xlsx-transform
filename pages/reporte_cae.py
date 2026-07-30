@@ -18,7 +18,7 @@ with col1:
     )
     if file_anterior is not None:
         df_anterior = pd.read_excel(
-            file_anterior, sheet_name="REPORTE_GESTIONES_TODAS_ETAPAS"
+            file_anterior, sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS"
         )
         st.success(f"Archivo cargado: {file_anterior.name}")
         st.dataframe(df_anterior.head())
@@ -32,7 +32,7 @@ with col2:
     )
     if file_actual is not None:
         df_actual = pd.read_excel(
-            file_actual, sheet_name="REPORTE_GESTIONES_TODAS_ETAPAS"
+            file_actual, sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS"
         )
         st.success(f"Archivo cargado: {file_actual.name}")
         st.dataframe(df_actual.head())
