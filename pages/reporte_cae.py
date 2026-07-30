@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 from styles import setup_page
@@ -16,7 +17,9 @@ with col1:
         key="cae_anterior",
     )
     if file_anterior is not None:
+        df_anterior = pd.read_excel(file_anterior)
         st.success(f"Archivo cargado: {file_anterior.name}")
+        st.dataframe(df_anterior.head())
 
 with col2:
     st.header("Reporte actual")
@@ -26,7 +29,9 @@ with col2:
         key="cae_actual",
     )
     if file_actual is not None:
+        df_actual = pd.read_excel(file_actual)
         st.success(f"Archivo cargado: {file_actual.name}")
+        st.dataframe(df_actual.head())
 
 if file_anterior is not None and file_actual is not None:
     st.divider()
