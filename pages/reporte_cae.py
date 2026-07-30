@@ -17,7 +17,9 @@ with col1:
         key="cae_anterior",
     )
     if file_anterior is not None:
-        df_anterior = pd.read_excel(file_anterior)
+        df_anterior = pd.read_excel(
+            file_anterior, sheet_name="REPORTE_GESTIONES_TODAS_ETAPAS"
+        )
         st.success(f"Archivo cargado: {file_anterior.name}")
         st.dataframe(df_anterior.head())
 
@@ -29,7 +31,9 @@ with col2:
         key="cae_actual",
     )
     if file_actual is not None:
-        df_actual = pd.read_excel(file_actual)
+        df_actual = pd.read_excel(
+            file_actual, sheet_name="REPORTE_GESTIONES_TODAS_ETAPAS"
+        )
         st.success(f"Archivo cargado: {file_actual.name}")
         st.dataframe(df_actual.head())
 
