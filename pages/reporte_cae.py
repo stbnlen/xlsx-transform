@@ -53,6 +53,13 @@ if file_anterior is not None and file_actual is not None:
     df_nuevos = df_actual[~df_actual[key_actual_col].astype(str).isin(keys_anterior)]
     df_nuevos = df_nuevos.drop(columns=[key_actual_col])
     df_nuevos["OPERACIÓN"] = df_nuevos["OPERACIÓN"].astype(str)
+    df_nuevos["CÓDIGO TRÁMITE"] = df_nuevos["CÓDIGO TRÁMITE"].astype(str)
+    df_nuevos["FECHA SATCHMO"] = pd.to_datetime(
+        df_nuevos["FECHA SATCHMO"], errors="coerce"
+    ).dt.strftime("%d-%m-%Y")
+    df_nuevos["FECHA CREA"] = pd.to_datetime(
+        df_nuevos["FECHA CREA"], errors="coerce"
+    ).dt.strftime("%d-%m-%Y")
     df_nuevos["RUT DEUDOR"] = pd.to_numeric(df_nuevos["RUT DEUDOR"], errors="coerce")
     st.subheader("Registros nuevos en reporte actual")
     st.write(f"Total registros nuevos: {len(df_nuevos)}")

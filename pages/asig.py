@@ -27,6 +27,16 @@ MESES_ESPANOL = {
 setup_page("Asignaciones", "📋")
 
 
+def _find_column_insensitive(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    """Find the first column matching candidates case-insensitively."""
+    lower_map = {str(col).strip().lower(): col for col in df.columns}
+    for candidate in candidates:
+        key = candidate.strip().lower()
+        if key in lower_map:
+            return lower_map[key]
+    return None
+
+
 def process_forum_data(
     df_castigo: pd.DataFrame,
     df_vigente: pd.DataFrame,
@@ -97,11 +107,10 @@ def process_single_file(
 
     # Handle column mapping based on file type
     if file_type == "Castigo":
-        # Map Castigo file columns
-        if "CONTRATO" not in processed_df.columns and "CONTRATO" in df.columns:
-            processed_df["CONTRATO"] = df["CONTRATO"]
-        elif "CONTRATO" not in processed_df.columns:
-            processed_df["CONTRATO"] = ""
+        # Map Castigo file columns (case-insensitive, e.g. "contrato"/"CONTRATO")
+        if "CONTRATO" not in processed_df.columns:
+            source_col = _find_column_insensitive(df, ["CONTRATO"])
+            processed_df["CONTRATO"] = df[source_col] if source_col else ""
 
         if "NOMBRE CLIENTE" not in processed_df.columns:
             if "NOMBRE CLIENTE" in df.columns:
@@ -170,13 +179,10 @@ def process_single_file(
             processed_df["Año castigo"] = ""
 
     elif file_type == "Vigente":
-        # Map Vigente file columns
-        if "CONTRATO" not in processed_df.columns and "NumContrato" in df.columns:
-            processed_df["CONTRATO"] = df["NumContrato"]
-        elif "CONTRATO" not in processed_df.columns and "CONTRATO" in df.columns:
-            processed_df["CONTRATO"] = df["CONTRATO"]
-        elif "CONTRATO" not in processed_df.columns:
-            processed_df["CONTRATO"] = ""
+        # Map Vigente file columns (case-insensitive, e.g. "contrato"/"CONTRATO")
+        if "CONTRATO" not in processed_df.columns:
+            source_col = _find_column_insensitive(df, ["NumContrato", "CONTRATO"])
+            processed_df["CONTRATO"] = df[source_col] if source_col else ""
 
         if "NOMBRE CLIENTE" not in processed_df.columns:
             if "Nombre_Cliente" in df.columns:
