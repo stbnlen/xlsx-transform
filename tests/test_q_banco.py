@@ -12,7 +12,7 @@ def test_show_q_banco_view_with_missing_columns(mock_st):
     show_q_banco_view()
 
     mock_st.file_uploader.assert_called_once_with(
-        "Upload Excel file", type=["xlsx", "xls"], key="q_banco_uploader"
+        "Subir archivo Excel", type=["xlsx", "xls"], key="q_banco_uploader"
     )
 
 
@@ -43,12 +43,13 @@ def test_show_q_banco_view_with_data(mock_read_excel, mock_st):
     show_q_banco_view()
 
     mock_st.file_uploader.assert_called_once_with(
-        "Upload Excel file", type=["xlsx", "xls"], key="q_banco_uploader"
+        "Subir archivo Excel", type=["xlsx", "xls"], key="q_banco_uploader"
     )
     mock_read_excel.assert_called_once_with(mock_uploaded_file)
-    mock_st.subheader.assert_any_call("Original Data Preview:")
-    mock_st.dataframe.assert_any_call(test_df)
-    mock_st.write.assert_any_call(f"Original shape: {test_df.shape}")
+    mock_st.subheader.assert_any_call("Vista previa de datos originales:")
+    preview_df = mock_st.dataframe.call_args_list[0][0][0]
+    pd.testing.assert_frame_equal(preview_df, test_df.head(100))
+    mock_st.write.assert_any_call(f"Dimensiones originales: {test_df.shape}")
 
     mock_st.download_button.assert_called_once()
 
@@ -72,7 +73,7 @@ def test_show_q_banco_view_with_missing_columns_error(mock_read_excel, mock_st):
 
     mock_st.error.assert_called()
     error_call_args = mock_st.error.call_args[0][0]
-    assert "Missing columns" in error_call_args
+    assert "Faltan columnas" in error_call_args
     assert (
         "n_operacion_principal" in error_call_args or "origen_core" in error_call_args
     )

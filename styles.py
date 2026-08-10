@@ -1,201 +1,204 @@
-"""Custom styles and UI helpers for the Streamlit application."""
+"""Custom styles and UI helpers for the Streamlit application.
+
+The CSS below avoids hardcoded theme colors: surfaces and secondary texts
+are derived from ``currentColor`` via ``color-mix`` so they adapt to both
+dark and light client themes. Only the brand accent is fixed, matching
+``primaryColor`` in ``.streamlit/config.toml``.
+
+Selectors target ``data-testid`` attributes verified against
+Streamlit 1.61 (tabs no longer expose ``data-baseweb`` attributes).
+"""
+
+from pathlib import Path
 
 import streamlit as st
+
+BRAND_CSS_VARS = """
+:root {
+    --brand-primary: #6366f1;
+    --brand-primary-hover: #818cf8;
+    --brand-shadow: rgba(99, 102, 241, 0.25);
+}
+"""
 
 
 def inject_custom_css() -> None:
     """Inject global custom CSS to override default Streamlit looks."""
-    css = """
+    css = f"""
     <style>
-    /* Hide Streamlit default chrome - more specific selectors */
+    {BRAND_CSS_VARS}
+
+    /* Hide Streamlit default chrome */
     [data-testid="stToolbar"],
     footer,
-    #MainMenu,
-    .stAppHeader {
+    #MainMenu {{
         visibility: hidden;
         display: none;
-    }
-
-    /* Hide only the deploy button, not the entire header */
-    [data-testid="stHeader"] [data-testid="stDeployButton"] {
-        display: none;
-    }
+    }}
 
     /* Base layout spacing */
-    .block-container {
+    .block-container {{
         padding-top: 2rem;
         padding-bottom: 3rem;
-    }
+    }}
 
     /* Typography */
-    html, body, [class*="css"] {
-        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
+    h1, h2, h3, h4, h5, h6 {{
         font-weight: 700;
         letter-spacing: -0.02em;
-    }
+    }}
 
-    /* Dashboard cards */
-    .dashboard-card {
-        position: relative;
-        margin-bottom: 1rem;
+    /* Dashboard cards: any container holding a .card-marker */
+    div[data-testid="stVerticalBlock"]:has(.card-marker) {{
         border-radius: 16px;
-        border: 1px solid #334155;
-        background-color: #1e293b;
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        background-color: color-mix(in srgb, currentColor 5%, transparent);
         padding: 1.5rem;
-        transition: all 0.2s ease-in-out;
-        height: 100%;
         min-height: 180px;
-        overflow: hidden;
-    }
-    
-    .dashboard-card:hover {
-        border-color: #6366f1;
-        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.25);
+        height: 100%;
+        transition: all 0.2s ease-in-out;
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker):hover {{
+        border-color: var(--brand-primary);
+        box-shadow: 0 10px 25px -5px var(--brand-shadow);
         transform: translateY(-4px);
-    }
-    
-    .card-icon {
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker) .card-marker {{
+        display: none;
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker) .card-icon {{
         font-size: 2.5rem;
+        line-height: 1;
         margin-bottom: 0.75rem;
-    }
-    
-    .card-title {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #6366f1;
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    [data-testid="stPageLink"] {{
         margin-bottom: 0.5rem;
-        text-decoration: none;
-        transition: color 0.2s ease-in-out;
-    }
-    
-    .card-title:hover {
-        color: #818cf8;
-    }
-    
-    .card-description {
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    [data-testid="stPageLink-NavLink"] {{
+        padding: 0;
+        margin: 0;
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    [data-testid="stPageLink-NavLink"] span,
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    [data-testid="stPageLink-NavLink"] p {{
+        color: var(--brand-primary) !important;
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    [data-testid="stPageLink-NavLink"]:hover span,
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    [data-testid="stPageLink-NavLink"]:hover p {{
+        color: var(--brand-primary-hover) !important;
+    }}
+
+    div[data-testid="stVerticalBlock"]:has(.card-marker)
+    .card-description {{
         font-size: 0.95rem;
-        color: #94a3b8;
+        color: color-mix(in srgb, currentColor 62%, transparent);
         line-height: 1.4;
-    }
+    }}
 
     /* Primary button override */
-    .stButton > button {
+    .stButton > button {{
         border-radius: 10px;
         font-weight: 600;
         transition: all 0.2s ease-in-out;
-    }
+    }}
 
-    .stButton > button:hover {
+    .stButton > button:hover {{
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
-    }
+    }}
 
-    /* Headers */
-    h1, h2, h3 {
-        border-bottom: none !important;
-    }
-    
-    h1 a, h2 a, h3 a {
-        display: none !important;
-    }
-
-    /* Tabs - more robust selectors for production */
-    div[data-testid="stTabs"] {
+    /* Tabs (Streamlit >= 1.56 selectors) */
+    div[data-testid="stTabs"] {{
         margin-bottom: 2rem;
-    }
-    
-    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    }}
+
+    div[data-testid="stTabs"] [role="tablist"] {{
         gap: 8px !important;
-        background-color: #1e293b !important;
+        background-color: color-mix(
+            in srgb, currentColor 6%, transparent
+        ) !important;
         border-radius: 12px !important;
         padding: 6px !important;
         display: flex !important;
-    }
+    }}
 
-    div[data-testid="stTabs"] [data-baseweb="tab"] {
+    div[data-testid="stTabs"] [data-testid="stTab"] {{
         border-radius: 8px !important;
         padding: 10px 20px !important;
         font-weight: 600 !important;
-        color: #94a3b8 !important;
-        background-color: transparent !important;
+        color: color-mix(
+            in srgb, currentColor 62%, transparent
+        ) !important;
         border: none !important;
         transition: all 0.2s ease-in-out !important;
-    }
+    }}
 
-    div[data-testid="stTabs"] [data-baseweb="tab"]:hover {
-        background-color: #334155 !important;
-        color: #f8fafc !important;
-    }
+    div[data-testid="stTabs"] [data-testid="stTab"]:hover {{
+        background-color: color-mix(
+            in srgb, currentColor 12%, transparent
+        ) !important;
+        color: currentColor !important;
+    }}
 
-    div[data-testid="stTabs"] [aria-selected="true"] {
-        background-color: #6366f1 !important;
+    div[data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] {{
+        background-color: var(--brand-primary) !important;
         color: #ffffff !important;
-    }
+    }}
 
     /* File uploader */
-    .stUploadButton > button {
+    [data-testid="stFileUploader"] button {{
         border-radius: 10px;
-    }
+    }}
 
     /* Dataframes */
-    .stDataFrame {
+    [data-testid="stDataFrame"] {{
         border-radius: 12px;
         overflow: hidden;
-    }
-    
-    /* Ensure page links are visible */
-    .stPageLinkContainer {
-        display: block !important;
-        visibility: visible !important;
-        margin-bottom: 1rem;
-    }
-    
-    .stPageLinkContainer a {
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 0.5rem !important;
-        text-decoration: none !important;
-        color: #94a3b8 !important;
-        font-weight: 600 !important;
-        transition: color 0.2s ease-in-out !important;
-    }
-    
-    .stPageLinkContainer a:hover {
-        color: #6366f1 !important;
-    }
+    }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 
-def render_card(title: str, description: str, icon: str, page: str) -> None:
-    """Render a clickable dashboard navigation card."""
-    from pathlib import Path
+def render_card(
+    title: str,
+    description: str,
+    icon: str,
+    page: str,
+    badge: str | None = None,
+) -> None:
+    """Render a clickable dashboard navigation card.
 
+    The card is a Streamlit container styled via CSS (see the
+    ``.card-marker`` rules). Navigation uses ``st.page_link`` so routing
+    works with ``st.navigation`` regardless of the deployment base path.
+    """
     slug = Path(page).stem
-    card_html = f"""
-    <div class="dashboard-card">
-        <div class="card-icon">{icon}</div>
-        <a href="/{slug}" class="card-title">{title}</a>
-        <div class="card-description">{description}</div>
-    </div>
-    """
-    st.markdown(card_html, unsafe_allow_html=True)
-
-
-def setup_page(title: str, icon: str = "📊") -> None:
-    """Configure a standard internal page with custom styling.
-
-    This must be called before any other Streamlit command.
-    """
-    st.set_page_config(
-        page_title=title,
-        page_icon=icon,
-        layout="wide",
-        initial_sidebar_state="auto",
-    )
-    inject_custom_css()
-    st.page_link("app.py", label="⬅ Volver al inicio", icon="🏠")
+    card = st.container()
+    with card:
+        st.markdown(
+            f'<span class="card-marker card-marker-{slug}"></span>'
+            f'<div class="card-icon">{icon}</div>',
+            unsafe_allow_html=True,
+        )
+        st.page_link(page, label=title)
+        st.markdown(
+            f'<div class="card-description">{description}</div>',
+            unsafe_allow_html=True,
+        )
+        if badge:
+            st.badge(badge, icon="🚧", color="orange")

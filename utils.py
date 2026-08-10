@@ -17,18 +17,49 @@ except ImportError:
     HAS_STATSMODELS = False
 
 
+def apply_dark_chart_theme() -> None:
+    """Align matplotlib/seaborn figures with the app's dark theme.
+
+    Safe to call multiple times: it just updates global rcParams so every
+    figure rendered afterwards matches the colors in ``.streamlit/config.toml``.
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    sns.set_theme(style="darkgrid")
+    plt.rcParams.update(
+        {
+            "figure.facecolor": "#0f172a",
+            "axes.facecolor": "#0f172a",
+            "savefig.facecolor": "#0f172a",
+            "axes.edgecolor": "#334155",
+            "axes.labelcolor": "#f8fafc",
+            "text.color": "#f8fafc",
+            "xtick.color": "#94a3b8",
+            "ytick.color": "#94a3b8",
+            "grid.color": "#1e293b",
+            "legend.facecolor": "#1e293b",
+            "legend.edgecolor": "#334155",
+        }
+    )
+
+
 def normalize_column_name(col_name: Any) -> str:
-    """Normalize column name for comparison: lowercase and remove underscores.
+    """Normalize column name for comparison.
+
+    Lowercases, strips surrounding whitespace and removes underscores so
+    that headers like ``"ESTADO INICIAL "`` (trailing spaces are common in
+    production files) still match their expected counterparts.
 
     Args:
         col_name: Column name to normalize
 
     Returns:
-        Normalized column name (lowercase, underscores removed)
+        Normalized column name (lowercase, trimmed, underscores removed)
     """
     if not isinstance(col_name, str):
         col_name = str(col_name)
-    return re.sub(r"_+", "", col_name.lower())
+    return re.sub(r"_+", "", col_name.strip().lower())
 
 
 def find_matching_column(
@@ -429,6 +460,8 @@ def create_eda_charts(
         import matplotlib.pyplot as plt
         import seaborn as sns
 
+        apply_dark_chart_theme()
+
         if not pd.api.types.is_numeric_dtype(historical["total_amount"]):
             historical = historical.copy()
             historical["total_amount"] = pd.to_numeric(
@@ -635,6 +668,8 @@ def create_seasonal_decomposition_chart(
     try:
         import matplotlib.pyplot as plt
 
+        apply_dark_chart_theme()
+
         if not HAS_STATSMODELS:
             st.info("ℹ️ statsmodels not available for seasonal decomposition")
             return None
@@ -694,6 +729,8 @@ def create_correlation_heatmap(df: pd.DataFrame) -> None:
     try:
         import matplotlib.pyplot as plt
         import seaborn as sns
+
+        apply_dark_chart_theme()
 
         numeric_cols = [
             "total_amount",
@@ -758,6 +795,8 @@ def create_year_growth_chart(yearly_stats: pd.DataFrame) -> None:
         import matplotlib.pyplot as plt
         import seaborn as sns
 
+        apply_dark_chart_theme()
+
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
         ax1 = axes[0]
@@ -795,6 +834,8 @@ def create_monthly_pattern_chart(historical: pd.DataFrame) -> None:
     try:
         import matplotlib.pyplot as plt
         import seaborn as sns
+
+        apply_dark_chart_theme()
 
         month_labels = [
             "Jan",
@@ -851,6 +892,8 @@ def create_trend_analysis(historical: pd.DataFrame) -> None:
         import matplotlib.pyplot as plt
         import seaborn as sns
         from scipy import stats as scipy_stats
+
+        apply_dark_chart_theme()
 
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 

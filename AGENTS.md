@@ -125,19 +125,20 @@ except Exception as e:
 xlsx-transform/
 ├── .streamlit/
 │   └── config.toml     # Streamlit theme and UI configuration
-├── app.py              # Main Streamlit entry point (dashboard navigation)
-├── styles.py           # Global CSS and page setup helpers
-├── utils.py            # Shared utility functions (stats, charts)
+├── app.py              # Entry point: st.navigation router (set_page_config lives here)
+├── styles.py           # Global CSS (theme-adaptive) and render_card helper
+├── utils.py            # Shared utility functions (stats, charts, dark chart theme)
 ├── utils_new_cd.py     # Utilities for New CD module
 ├── q_banco.py          # Q_BANCO view module
 ├── q_cmr.py            # Q_CMR view module
 ├── pagos_frm.py        # PAGOS_FRM view module (analysis + ML)
 ├── pagos_bci.py        # Pagos BCI and BCI merge views
 ├── pages/
+│   ├── home.py         # Dashboard home page (module cards)
 │   ├── asig.py         # Asignaciones page (tabs: Q_BANCO, Q_CMR, FORUM, BCI)
 │   ├── pagos.py        # Payments page (tabs: PAGOS_FRM, PAGOS BCI)
 │   ├── new_cd.py       # New CD analytics page
-│   ├── reporte_cae.py  # Reporte CAE page (under construction)
+│   ├── reporte_cae.py  # Reporte CAE page
 │   └── compromisos.py  # Compromisos page (under construction)
 ├── tests/
 │   ├── test_app.py
@@ -149,6 +150,16 @@ xlsx-transform/
 │   └── test_new_cd.py
 └── requirements.txt
 ```
+
+### Navigation Architecture
+
+- `app.py` is a pure router: it calls `st.set_page_config` once, injects the
+  global CSS, declares the pages with `st.Page`, and runs `st.navigation(...).run()`.
+- Individual pages must NOT call `st.set_page_config` (it can only run once).
+- Use `st.page_link` for in-app navigation; the dashboard cards in
+  `pages/home.py` are built with `render_card` from `styles.py`.
+- `streamlit` is pinned in `requirements.txt` because CSS selectors
+  (`data-testid`) change between versions and must match production.
 
 ### Key DataFrame Column Names (Internal)
 

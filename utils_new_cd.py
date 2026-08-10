@@ -275,5 +275,5 @@ def fig_to_streamlit(fig, st):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
     buf.seek(0)
-    st.image(buf, use_container_width=True)
+    st.image(buf, width="stretch")
     plt.close(fig)

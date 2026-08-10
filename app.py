@@ -1,6 +1,6 @@
 import streamlit as st
 
-from styles import inject_custom_css, render_card
+from styles import inject_custom_css
 
 st.set_page_config(
     page_title="Excel Transformer",
@@ -11,61 +11,14 @@ st.set_page_config(
 
 inject_custom_css()
 
-st.title("Excel Transformer")
-st.markdown(
-    "<h3 style='color: #94a3b8; font-weight: 400;'>"
-    "Selecciona un módulo para comenzar"
-    "</h3>",
-    unsafe_allow_html=True,
-)
+PAGES = [
+    st.Page("pages/home.py", title="Inicio", icon="🏠", default=True),
+    st.Page("pages/asig.py", title="Asignaciones", icon="📋"),
+    st.Page("pages/pagos.py", title="Pagos", icon="💰"),
+    st.Page("pages/new_cd.py", title="New CD", icon="📞"),
+    st.Page("pages/reporte_cae.py", title="Reporte CAE", icon="📊"),
+    st.Page("pages/compromisos.py", title="Compromisos", icon="🤝"),
+]
 
-st.divider()
-
-st.markdown("### Módulos")
-
-row1_col1, row1_col2, row1_col3 = st.columns(3)
-
-with row1_col1:
-    render_card(
-        title="Asignaciones",
-        description="Procesa archivos de asignación Q_BANCO, Q_CMR, FORUM y BCI.",
-        icon="📋",
-        page="pages/asig.py",
-    )
-
-with row1_col2:
-    render_card(
-        title="Pagos",
-        description="Analiza datos de pagos PAGOS_FRM y PAGOS BCI.",
-        icon="💰",
-        page="pages/pagos.py",
-    )
-
-with row1_col3:
-    render_card(
-        title="New CD",
-        description="Análisis y predicción del centro de contacto.",
-        icon="📞",
-        page="pages/new_cd.py",
-    )
-
-row2_col1, row2_col2, row2_col3 = st.columns(3)
-
-with row2_col1:
-    render_card(
-        title="Reporte CAE",
-        description="Módulo de reportes CAE.",
-        icon="📊",
-        page="pages/reporte_cae.py",
-    )
-
-with row2_col2:
-    render_card(
-        title="Compromisos",
-        description="Módulo de seguimiento de compromisos.",
-        icon="🤝",
-        page="pages/compromisos.py",
-    )
-
-with row2_col3:
-    st.empty()
+pg = st.navigation(PAGES)
+pg.run()

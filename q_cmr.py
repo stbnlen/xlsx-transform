@@ -24,19 +24,26 @@ MESES_ESPANOL = {
     12: "dic",
 }
 
+PREVIEW_ROWS = 100
+
 
 def show_q_cmr_view() -> None:
     """Display Q_CMR view for filtering and downloading Excel files."""
     uploaded_file = st.file_uploader(
-        "Upload Excel file", type=["xlsx", "xls"], key="q_cmr_uploader"
+        "Subir archivo Excel", type=["xlsx", "xls"], key="q_cmr_uploader"
     )
 
     if uploaded_file is not None:
-        df = pd.read_excel(uploaded_file)
+        with st.spinner("Leyendo archivo..."):
+            df = pd.read_excel(uploaded_file)
 
-        st.subheader("Original Data Preview:")
-        st.dataframe(df)
-        st.write(f"Original shape: {df.shape}")
+        st.subheader("Vista previa de datos originales:")
+        st.dataframe(df.head(PREVIEW_ROWS))
+        st.caption(
+            f"Mostrando las primeras {min(PREVIEW_ROWS, len(df))} de "
+            f"{len(df)} filas."
+        )
+        st.write(f"Dimensiones originales: {df.shape}")
 
         columns_to_keep = [
             "rut",
@@ -60,10 +67,10 @@ def show_q_cmr_view() -> None:
         )
 
         if missing_columns:
-            st.error(f"Missing columns in the uploaded file: {missing_columns}")
-            st.write("Available columns:", list(df.columns))
+            st.error(f"Faltan columnas en el archivo cargado: {missing_columns}")
+            st.write("Columnas disponibles:", list(df.columns))
             st.write(
-                "Normalized available columns:",
+                "Columnas disponibles normalizadas:",
                 [normalize_column_name(col) for col in df.columns],
             )
         else:
@@ -75,9 +82,9 @@ def show_q_cmr_view() -> None:
             }
             filtered_df = filtered_df.rename(columns=rename_dict)
 
-            st.subheader("Filtered Data Preview:")
-            st.dataframe(filtered_df)
-            st.write(f"Filtered shape: {filtered_df.shape}")
+            st.subheader("Vista previa de datos filtrados:")
+            st.dataframe(filtered_df.head(PREVIEW_ROWS))
+            st.write(f"Dimensiones filtradas: {filtered_df.shape}")
 
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -90,7 +97,7 @@ def show_q_cmr_view() -> None:
             nombre_archivo = f"CMR_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
 
             st.download_button(
-                label="Download Filtered Excel",
+                label="Descargar Excel filtrado",
                 data=output.getvalue(),
                 file_name=nombre_archivo,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

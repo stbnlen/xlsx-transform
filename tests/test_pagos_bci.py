@@ -12,12 +12,12 @@ def test_show_pagos_bci_view_with_no_file(mock_st):
     show_pagos_bci_view()
 
     mock_st.file_uploader.assert_called_once_with(
-        "Upload Excel file", type=["xlsx", "xls"], key="pagos_bci_uploader"
+        "Subir archivo Excel", type=["xlsx", "xls"], key="pagos_bci_uploader"
     )
 
     mock_st.header.assert_called_once_with("PAGOS BCI")
-    mock_st.write.assert_called_once_with(
-        "Under construction - Please upload an Excel file to preview"
+    mock_st.info.assert_called_once_with(
+        "Módulo en construcción: sube un archivo Excel para ver la vista previa."
     )
 
 
@@ -35,16 +35,16 @@ def test_show_pagos_bci_view_with_data(mock_read_excel, mock_st):
     show_pagos_bci_view()
 
     mock_st.file_uploader.assert_called_once_with(
-        "Upload Excel file", type=["xlsx", "xls"], key="pagos_bci_uploader"
+        "Subir archivo Excel", type=["xlsx", "xls"], key="pagos_bci_uploader"
     )
     mock_read_excel.assert_called_once_with(mock_uploaded_file)
     mock_st.header.assert_called_once_with("PAGOS BCI")
-    mock_st.subheader.assert_called_once_with("Data Preview (First 5 rows):")
+    mock_st.subheader.assert_called_once_with("Vista previa (primeras 5 filas):")
 
     mock_st.dataframe.assert_called_once()
     called_args = mock_st.dataframe.call_args[0]
     called_df = called_args[0]
     pd.testing.assert_frame_equal(called_df, test_df.head())
 
-    mock_st.write.assert_any_call(f"Shape: {test_df.shape}")
-    mock_st.write.assert_any_call(f"Columns: {list(test_df.columns)}")
+    mock_st.write.assert_any_call(f"Dimensiones: {test_df.shape}")
+    mock_st.write.assert_any_call(f"Columnas: {list(test_df.columns)}")

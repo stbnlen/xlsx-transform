@@ -6,10 +6,10 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 
-from styles import setup_page
+from utils import apply_dark_chart_theme
 from utils_new_cd import (
-    fig_to_streamlit as _fts,
     calc_week_of_month,
+    fig_to_streamlit,
     train_and_predict,
 )
 
@@ -20,7 +20,21 @@ def cached_train_and_predict(df_cached):
     return train_and_predict(df_cached)
 
 
-setup_page("New CD", "📞")
+@st.cache_data(show_spinner=False)
+def load_raw_data(file_bytes: bytes, file_name: str) -> pd.DataFrame:
+    """Read the uploaded file once per unique file.
+
+    Avoids re-parsing the whole Excel/CSV on every rerun (e.g. when the
+    user interacts with the sidebar filters).
+    """
+    buffer = io.BytesIO(file_bytes)
+    if file_name.lower().endswith(".csv"):
+        raw = pd.read_csv(buffer)
+    else:
+        raw = pd.read_excel(buffer)
+    raw.columns = raw.columns.str.strip().str.lower()
+    return raw
+
 
 MESES_ESPANOL = {
     1: "enero",
@@ -49,46 +63,31 @@ if uploaded_file is None:
     st.markdown("### Carga un archivo para comenzar el análisis")
     st.stop()
 
-if uploaded_file.name.endswith(".csv"):
-    df = pd.read_csv(uploaded_file)
-else:
-    df = pd.read_excel(uploaded_file)
-
-df.columns = df.columns.str.strip().str.lower()
+with st.spinner("Leyendo archivo..."):
+    df = load_raw_data(uploaded_file.getvalue(), uploaded_file.name)
 
 expected_cols = {"id_mandante", "fecha_llamada"}
 if not expected_cols.issubset(set(df.columns)):
-    st.error(f"El archivo debe contener las columnas: {expected_cols}")
+    st.error(f"El archivo debe contener las columnas: {sorted(expected_cols)}")
     st.stop()
 
 df["fecha_llamada"] = pd.to_datetime(df["fecha_llamada"], errors="coerce")
 df = df.dropna(subset=["fecha_llamada"])
+
+if df.empty:
+    st.error("El archivo no contiene registros con una fecha de llamada válida.")
+    st.stop()
 
 if "countcd" not in df.columns:
     df["countcd"] = 1
 else:
     df["countcd"] = pd.to_numeric(df["countcd"], errors="coerce")
 
-sns.set_theme(style="whitegrid")
-
-mandantes = df["id_mandante"].unique()
-date_range = f"{df['fecha_llamada'].min().strftime('%Y-%m-%d')} to {df['fecha_llamada'].max().strftime('%Y-%m-%d')}"
-total_contacts = int(df["countcd"].sum())
-
-# Resumen general en el cuerpo principal
-summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
-with summary_col1:
-    st.metric("Registros totales", f"{len(df):,}")
-with summary_col2:
-    st.metric("Mandantes", len(mandantes))
-with summary_col3:
-    st.metric("Rango de fechas", date_range)
-with summary_col4:
-    st.metric("Contactos totales", f"{total_contacts:,}")
-
+apply_dark_chart_theme()
 
 # Filtros globales
 st.sidebar.header("Filtros")
+mandantes = df["id_mandante"].unique()
 filter_mandante = st.sidebar.multiselect(
     "Mandante",
     options=sorted(mandantes),
@@ -114,26 +113,33 @@ df_filtered = df[df["id_mandante"].isin(filter_mandante)].copy()
 if "grupo" in df.columns and filter_grupo:
     df_filtered = df_filtered[df_filtered["grupo"].isin(filter_grupo)]
 
-# Actualizar variables con datos filtrados
-mandantes_filtered = df_filtered["id_mandante"].unique()
-date_range_filtered = f"{df_filtered['fecha_llamada'].min().strftime('%Y-%m-%d')} a {df_filtered['fecha_llamada'].max().strftime('%Y-%m-%d')}"
-total_contacts_filtered = int(df_filtered["countcd"].sum())
+if df_filtered.empty:
+    st.warning("Los filtros seleccionados no dejan registros. Ajusta la selección.")
+    st.stop()
 
-# Actualizar métricas del resumen
+# Resumen general (una sola vez, con los datos ya filtrados)
+mandantes = df_filtered["id_mandante"].unique()
+min_date = df_filtered["fecha_llamada"].min()
+max_date = df_filtered["fecha_llamada"].max()
+date_range = f"{min_date:%d-%m-%y} a {max_date:%d-%m-%y}"
+total_contacts = int(df_filtered["countcd"].sum())
+
+summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
 with summary_col1:
     st.metric("Registros totales", f"{len(df_filtered):,}")
 with summary_col2:
-    st.metric("Mandantes", len(mandantes_filtered))
+    st.metric("Mandantes", len(mandantes))
 with summary_col3:
-    st.metric("Rango de fechas", date_range_filtered)
+    st.metric(
+        "Rango de fechas",
+        date_range,
+        help=f"{min_date:%Y-%m-%d} a {max_date:%Y-%m-%d}",
+    )
 with summary_col4:
-    st.metric("Contactos totales", f"{total_contacts_filtered:,}")
+    st.metric("Contactos totales", f"{total_contacts:,}")
 
 # Usar df_filtered para el resto del análisis
 df = df_filtered
-mandantes = mandantes_filtered
-date_range = date_range_filtered
-total_contacts = total_contacts_filtered
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
     [
@@ -156,7 +162,7 @@ with tab1:
     col3.metric("Valores nulos", int(df.isnull().sum().sum()))
 
     st.write("**Primeras 10 filas:**")
-    st.dataframe(df.head(10), use_container_width=True)
+    st.dataframe(df.head(10), width="stretch")
 
     st.write("**Tipos de datos:**")
     st.dataframe(
@@ -167,7 +173,7 @@ with tab1:
                 "Non-null": df.count().values,
             }
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     if "grupo" in df.columns:
@@ -176,7 +182,7 @@ with tab1:
         grupo_df = pd.DataFrame(
             {"Grupo": grupo_counts.index, "Contactos": grupo_counts.values}
         )
-        st.dataframe(grupo_df, use_container_width=True)
+        st.dataframe(grupo_df, width="stretch")
 
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.bar(
@@ -189,7 +195,7 @@ with tab1:
         ax.set_ylabel("Contactos totales")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     if "hora_llamada" in df.columns:
         st.write("**Distribución por hora del día (7:00 - 21:00):**")
@@ -203,7 +209,7 @@ with tab1:
         ax.set_xlabel("Hora")
         ax.set_ylabel("Contactos totales")
         fig.tight_layout()
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     if "rut_dv" in df.columns:
         total_ruts = df["rut_dv"].nunique()
@@ -250,7 +256,7 @@ with tab2:
         ax.set_title("Contactos totales por mandante")
         ax.set_xlabel("Mandante")
         ax.set_ylabel("Contactos totales")
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     with col2:
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -261,7 +267,7 @@ with tab2:
             colors=sns.color_palette("pastel", len(mandante_agg)),
         )
         ax.set_title("Distribución porcentual por mandante")
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     if "grupo" in df.columns:
         st.write("---")
@@ -273,7 +279,7 @@ with tab2:
         mandante_grupo_pivot = mandante_grupo.pivot(
             index="Mandante", columns="Grupo", values="Contactos"
         ).fillna(0)
-        st.dataframe(mandante_grupo_pivot, use_container_width=True)
+        st.dataframe(mandante_grupo_pivot, width="stretch")
 
         fig, ax = plt.subplots(figsize=(10, 6))
         mandante_grupo_pivot.plot(kind="bar", stacked=True, ax=ax, colormap="Set2")
@@ -283,7 +289,7 @@ with tab2:
         ax.legend(title="Grupo")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     st.write("**Tabla resumen por mandante:**")
     st.dataframe(
@@ -296,7 +302,7 @@ with tab2:
                 "daily_std": "{:,.1f}",
             }
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 with tab3:
@@ -325,7 +331,7 @@ with tab3:
     ax.set_ylabel("Contactos")
     ax.legend()
     fig.autofmt_xdate()
-    _fts(fig, st)
+    fig_to_streamlit(fig, st)
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.fill_between(
@@ -339,7 +345,7 @@ with tab3:
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Contactos totales")
     fig.autofmt_xdate()
-    _fts(fig, st)
+    fig_to_streamlit(fig, st)
 
     # Mapear day_name() de inglés a español
     day_name_map = {
@@ -381,7 +387,7 @@ with tab3:
     ax.set_title("Contactos totales por día de la semana")
     ax.set_xlabel("Día")
     ax.set_ylabel("Contactos totales")
-    _fts(fig, st)
+    fig_to_streamlit(fig, st)
 
     if "grupo" in df.columns:
         st.write("---")
@@ -399,7 +405,7 @@ with tab3:
         ax.set_ylabel("Contactos")
         ax.legend()
         fig.autofmt_xdate()
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     if "hora_llamada" in df.columns:
         st.write("---")
@@ -420,7 +426,7 @@ with tab3:
         ax.legend()
         ax.set_xticks(range(7, 22))
         fig.tight_layout()
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
 with tab4:
     st.subheader("Análisis de distribución")
@@ -439,7 +445,7 @@ with tab4:
         ax.set_title("Distribución de contactos diarios")
         ax.set_xlabel("Contactos por día")
         ax.set_ylabel("Frecuencia")
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     with col2:
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -453,7 +459,7 @@ with tab4:
         ax.set_title("Diagrama de caja por mandante")
         ax.set_xlabel("Mandante")
         ax.set_ylabel("Contactos por día")
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
     st.write("**Estadísticas de distribución por mandante:**")
     dist_stats = (
@@ -462,7 +468,7 @@ with tab4:
     numeric_cols = dist_stats.select_dtypes(include="number").columns
     st.dataframe(
         dist_stats.style.format({col: "{:.2f}" for col in numeric_cols}),
-        use_container_width=True,
+        width="stretch",
     )
 
     if "grupo" in df.columns:
@@ -480,7 +486,7 @@ with tab4:
         ax.set_ylabel("Contactos por día")
         plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
-        _fts(fig, st)
+        fig_to_streamlit(fig, st)
 
 with tab5:
     st.subheader("Estadísticas descriptivas")
@@ -529,7 +535,7 @@ with tab5:
                 ],
             }
         )
-        st.dataframe(stats_df, use_container_width=True)
+        st.dataframe(stats_df, width="stretch")
 
     with col2:
         st.write("**Top 10 fechas con más contactos:**")
@@ -541,7 +547,7 @@ with tab5:
             .reset_index()
         )
         top_dates["fecha_llamada"] = top_dates["fecha_llamada"].dt.strftime("%Y-%m-%d")
-        st.dataframe(top_dates, use_container_width=True)
+        st.dataframe(top_dates, width="stretch")
 
     st.write("**Estadísticas por mandante (diario):**")
     mandante_stats = (
@@ -579,7 +585,7 @@ with tab5:
                 "Registros": "{:.0f}",
             }
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     st.write("**Matriz de correlación (variables temporales vs Contactos):**")
@@ -631,7 +637,7 @@ with tab5:
     ax.set_xticklabels(labels, rotation=45, ha="right")
     ax.set_yticklabels(labels, rotation=0)
     fig.tight_layout()
-    _fts(fig, st)
+    fig_to_streamlit(fig, st)
 
     st.write("**Promedio de contactos por día de la semana:**")
     daily_dow = (
@@ -667,7 +673,7 @@ with tab5:
             }
         )
         .style.format({"Promedio": "{:.2f}", "Total": "{:.0f}", "Registros": "{:.0f}"}),
-        use_container_width=True,
+        width="stretch",
     )
 
     st.write("**Promedio de contactos por mes:**")
@@ -709,7 +715,7 @@ with tab5:
             }
         )
         .style.format({"Promedio": "{:.2f}", "Total": "{:.0f}", "Registros": "{:.0f}"}),
-        use_container_width=True,
+        width="stretch",
     )
 
     if "grupo" in df.columns:
@@ -740,7 +746,7 @@ with tab5:
                     "Registros": "{:,.0f}",
                 }
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
 with tab6:
@@ -777,7 +783,7 @@ with tab6:
                         "prediction": "{:.1f}",
                     }
                 ),
-                use_container_width=True,
+                width="stretch",
             )
 
             total_mandante = df_mandante["prediction"].sum()
@@ -797,7 +803,7 @@ with tab6:
             ax.set_ylabel("CD esperados")
             plt.xticks(rotation=45, ha="right")
             fig.tight_layout()
-            _fts(fig, st)
+            fig_to_streamlit(fig, st)
     else:
         st.warning("No hay suficientes datos para generar la predicción.")
 
@@ -820,9 +826,7 @@ with tab7:
                 }
             )
             st.write("**Factor por día de la semana:**")
-            st.dataframe(
-                dow_df.style.format({"Factor": "{:.3f}"}), use_container_width=True
-            )
+            st.dataframe(dow_df.style.format({"Factor": "{:.3f}"}), width="stretch")
 
             fig, ax = plt.subplots(figsize=(6, 3))
             ax.bar(
@@ -832,7 +836,7 @@ with tab7:
             ax.set_title(f"Factor por día de la semana - {mandante}")
             ax.set_ylabel("Multiplicador")
             fig.tight_layout()
-            _fts(fig, st)
+            fig_to_streamlit(fig, st)
 
             semana_df = pd.DataFrame(
                 {
@@ -841,9 +845,7 @@ with tab7:
                 }
             )
             st.write("**Factor por semana del mes:**")
-            st.dataframe(
-                semana_df.style.format({"Factor": "{:.3f}"}), use_container_width=True
-            )
+            st.dataframe(semana_df.style.format({"Factor": "{:.3f}"}), width="stretch")
 
             fig, ax = plt.subplots(figsize=(6, 3))
             ax.bar(
@@ -857,7 +859,7 @@ with tab7:
             ax.set_ylabel("Multiplicador")
             ax.set_xticks([1, 2, 3, 4, 5])
             fig.tight_layout()
-            _fts(fig, st)
+            fig_to_streamlit(fig, st)
 
             nombres_meses = [
                 "Enero",
@@ -880,9 +882,7 @@ with tab7:
                 }
             )
             st.write("**Factor por mes (estacionalidad anual):**")
-            st.dataframe(
-                mes_df.style.format({"Factor": "{:.3f}"}), use_container_width=True
-            )
+            st.dataframe(mes_df.style.format({"Factor": "{:.3f}"}), width="stretch")
 
             fig, ax = plt.subplots(figsize=(10, 4))
             ax.bar(
@@ -896,7 +896,7 @@ with tab7:
             ax.set_ylabel("Multiplicador")
             plt.xticks(rotation=45, ha="right")
             fig.tight_layout()
-            _fts(fig, st)
+            fig_to_streamlit(fig, st)
 
         if "hora_llamada" in df.columns:
             st.write("---")
@@ -941,7 +941,7 @@ with tab7:
                         hora_df.style.format(
                             {"Factor": "{:.3f}", "Contactos": "{:,.0f}"}
                         ),
-                        use_container_width=True,
+                        width="stretch",
                     )
                 with col2:
                     fig, ax = plt.subplots(figsize=(8, 3))
@@ -956,7 +956,7 @@ with tab7:
                     ax.set_ylabel("Multiplicador")
                     ax.set_xticks(horas_rango)
                     fig.tight_layout()
-                    _fts(fig, st)
+                    fig_to_streamlit(fig, st)
     else:
         st.warning("No hay suficientes datos para generar los factores estacionales.")
 
@@ -990,7 +990,7 @@ with tab8:
 
         df_download = pd.DataFrame(download_rows)
 
-        st.dataframe(df_download, use_container_width=True)
+        st.dataframe(df_download, width="stretch")
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:

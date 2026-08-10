@@ -1,11 +1,27 @@
 import os
 
 
-def test_app_dashboard():
+def test_app_router():
     with open(os.path.join(os.path.dirname(__file__), "..", "app.py"), "r") as f:
         content = f.read()
 
     assert "st.set_page_config" in content
+    assert "st.navigation" in content
+    assert "st.Page" in content
+    assert "Asignaciones" in content
+    assert "Pagos" in content
+    assert "New CD" in content
+    assert "Reporte CAE" in content
+    assert "Compromisos" in content
+
+
+def test_home_dashboard():
+    home_path = os.path.join(os.path.dirname(__file__), "..", "pages", "home.py")
+    assert os.path.exists(home_path), "home.py should exist in pages directory"
+
+    with open(home_path, "r") as f:
+        content = f.read()
+
     assert 'st.title("Excel Transformer")' in content
     assert "render_card" in content
     assert "Asignaciones" in content
@@ -25,7 +41,7 @@ def test_styles_provides_navigation():
 
     assert "st.page_link" in content
     assert "inject_custom_css" in content
-    assert "setup_page" in content
+    assert "render_card" in content
 
 
 def test_app_imports():
@@ -37,6 +53,21 @@ def test_app_imports():
     assert "from q_cmr import show_q_cmr_view" not in content
     assert "from pagos_frm import show_pagos_frm_view" not in content
     assert "from pagos_bci import show_pagos_bci_view" not in content
+
+
+def test_navigation_smoke():
+    from streamlit.testing.v1 import AppTest
+
+    app_path = os.path.join(os.path.dirname(__file__), "..", "app.py")
+    at = AppTest.from_file(app_path, default_timeout=30)
+    at.run()
+    assert not at.exception
+    assert [t.value for t in at.title] == ["Excel Transformer"]
+
+    at.switch_page("pages/asig.py")
+    at.run()
+    assert not at.exception
+    assert [t.value for t in at.title] == ["Asignaciones"]
 
 
 def test_asig_page_tabs():

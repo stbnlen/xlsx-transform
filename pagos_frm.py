@@ -7,6 +7,7 @@ import streamlit as st
 
 from utils import (
     aggregate_monthly,
+    apply_dark_chart_theme,
     calculate_correlations,
     calculate_descriptive_stats,
     calculate_monthly_stats,
@@ -46,11 +47,12 @@ except ImportError:
 def show_pagos_frm_view():
     """Display PAGOS_FRM view for data analysis and download."""
     uploaded_file = st.file_uploader(
-        "Upload Excel file", type=["xlsx", "xls"], key="pagos_frm_uploader"
+        "Subir archivo Excel", type=["xlsx", "xls"], key="pagos_frm_uploader"
     )
 
     if uploaded_file is not None:
-        df = pd.read_excel(uploaded_file)
+        with st.spinner("Leyendo archivo..."):
+            df = pd.read_excel(uploaded_file)
 
         df_clean = clean_dataframe(df)
 
@@ -621,6 +623,8 @@ def _show_analysis_by_executive(df_original: pd.DataFrame, monthly: pd.DataFrame
     try:
         import matplotlib.pyplot as plt
 
+        apply_dark_chart_theme()
+
         if len(monthly) == 0:
             st.warning("⚠️ No monthly data available")
             return
@@ -894,6 +898,8 @@ def _show_comparative_monthly_analysis(
 
     try:
         import matplotlib.pyplot as plt
+
+        apply_dark_chart_theme()
 
         if len(monthly) == 0:
             st.warning("⚠️ No monthly data available")

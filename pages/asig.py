@@ -7,7 +7,6 @@ import streamlit as st
 from pagos_bci import show_bci_view
 from q_banco import show_q_banco_view
 from q_cmr import show_q_cmr_view
-from styles import setup_page
 
 MESES_ESPANOL = {
     1: "ene",
@@ -23,8 +22,6 @@ MESES_ESPANOL = {
     11: "nov",
     12: "dic",
 }
-
-setup_page("Asignaciones", "📋")
 
 
 def _find_column_insensitive(df: pd.DataFrame, candidates: list[str]) -> str | None:
@@ -287,8 +284,9 @@ with tab3:
 
         try:
             # Read both Excel files
-            df_castigo = pd.read_excel(uploaded_file1)
-            df_vigente = pd.read_excel(uploaded_file2)
+            with st.spinner("Leyendo archivos..."):
+                df_castigo = pd.read_excel(uploaded_file1)
+                df_vigente = pd.read_excel(uploaded_file2)
 
             # Show previews with type handling to avoid Arrow conversion errors
             st.write("Vista previa del archivo Castigo:")
@@ -339,7 +337,8 @@ with tab3:
     elif uploaded_file1 is not None:
         st.info("Carga el archivo Vigente para continuar.")
         try:
-            df1 = pd.read_excel(uploaded_file1)
+            with st.spinner("Leyendo archivo..."):
+                df1 = pd.read_excel(uploaded_file1)
             st.write("Vista previa del archivo Castigo:")
             st.dataframe(df1.head())
         except Exception as e:
@@ -347,7 +346,8 @@ with tab3:
     elif uploaded_file2 is not None:
         st.info("Carga el archivo Castigo para continuar.")
         try:
-            df2 = pd.read_excel(uploaded_file2)
+            with st.spinner("Leyendo archivo..."):
+                df2 = pd.read_excel(uploaded_file2)
             st.write("Vista previa del archivo Vigente:")
             st.dataframe(df2.head())
         except Exception as e:

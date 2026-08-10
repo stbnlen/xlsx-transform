@@ -1,12 +1,8 @@
 import io
+from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
-from datetime import datetime, timedelta
-
-from styles import setup_page
-
-setup_page("Compromisos", "")
 
 MESES_ESPANOL = {
     1: "ene",
@@ -79,7 +75,8 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     try:
         # Leer el archivo sin dtype=str para que las fechas se parseen automáticamente
-        df = pd.read_excel(uploaded_file)
+        with st.spinner("Leyendo archivo..."):
+            df = pd.read_excel(uploaded_file)
 
         # Eliminar columnas L, M, N, O (posiciones 11, 12, 13, 14)
         columnas_a_eliminar = [11, 12, 13, 14]
@@ -144,7 +141,7 @@ if uploaded_file is not None:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_filtrado.to_excel(writer, index=False, sheet_name="DEMO")
 
-                from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
                 worksheet = writer.sheets["DEMO"]
 
