@@ -13,6 +13,7 @@ col1, col2 = st.columns(2)
 
 df_anterior = None
 df_actual = None
+key_anterior_col = None
 
 with col1:
     st.header("Reporte día anterior")
@@ -25,11 +26,29 @@ with col1:
         try:
             with st.spinner("Leyendo reporte día anterior..."):
                 df_anterior = pd.read_excel(file_anterior, sheet_name=REPORT_SHEET)
+            llave_matches = [
+                c for c in df_anterior.columns if str(c).lower() == "llave"
+            ]
+            if llave_matches:
+                key_anterior_col = llave_matches[0]
+            else:
+                key_anterior_col = "Llave"
+                df_anterior.insert(
+                    0,
+                    key_anterior_col,
+                    df_anterior["OPERACIÓN"].astype(str)
+                    + df_anterior["ETAPA SATCHMO"].astype(str),
+                )
             st.success(f"Archivo cargado: {file_anterior.name}")
             st.dataframe(df_anterior.head())
         except Exception as e:
+            df_anterior = None
             st.error(f"Error al leer el reporte día anterior: {e}")
-            st.info(f"El archivo debe contener la hoja '{REPORT_SHEET}'.")
+            st.info(
+                f"El archivo debe contener la hoja '{REPORT_SHEET}' y, si no "
+                "incluye la columna 'Llave', las columnas 'OPERACIÓN' y "
+                "'ETAPA SATCHMO'."
+            )
 
 with col2:
     st.header("Reporte actual")
@@ -59,7 +78,6 @@ with col2:
 if df_anterior is not None and df_actual is not None:
     st.divider()
     try:
-        key_anterior_col = df_anterior.columns[0]
         keys_anterior = set(df_anterior[key_anterior_col].astype(str))
         key_actual_col = df_actual.columns[0]
         df_nuevos = df_actual[
