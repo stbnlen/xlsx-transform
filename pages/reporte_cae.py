@@ -30,14 +30,26 @@ with col1:
                 c for c in df_anterior.columns if str(c).lower() == "llave"
             ]
             if llave_matches:
-                key_anterior_col = llave_matches[0]
-            else:
-                key_anterior_col = "Llave"
-                df_anterior.insert(
-                    0,
-                    key_anterior_col,
-                    df_anterior["OPERACIÓN"].astype(str)
-                    + df_anterior["ETAPA SATCHMO"].astype(str),
+                candidate_col = llave_matches[0]
+                candidate_values = df_anterior[candidate_col]
+                valid_values = candidate_values.notna() & candidate_values.astype(
+                    str
+                ).str.strip().ne("")
+                if valid_values.any():
+                    key_anterior_col = candidate_col
+            if key_anterior_col is None:
+                llave_values = df_anterior["OPERACIÓN"].astype(str) + df_anterior[
+                    "ETAPA SATCHMO"
+                ].astype(str)
+                if llave_matches:
+                    key_anterior_col = llave_matches[0]
+                    df_anterior[key_anterior_col] = llave_values
+                else:
+                    key_anterior_col = "Llave"
+                    df_anterior.insert(0, key_anterior_col, llave_values)
+                st.info(
+                    "La columna 'Llave' del reporte día anterior estaba vacía o "
+                    "no existía; se generó con OPERACIÓN + ETAPA SATCHMO."
                 )
             st.success(f"Archivo cargado: {file_anterior.name}")
             st.dataframe(df_anterior.head())
