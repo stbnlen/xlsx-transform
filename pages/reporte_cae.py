@@ -130,6 +130,14 @@ if df_anterior is not None and df_actual is not None:
                     showColumnStripes=False,
                 )
                 ws.add_table(table)
+                for idx, column in enumerate(df_nuevos.columns, start=1):
+                    width = max(
+                        len(str(column)),
+                        int(df_nuevos[column].astype(str).str.len().max()),
+                    )
+                    ws.column_dimensions[get_column_letter(idx)].width = min(
+                        width + 2, 255
+                    )
             st.download_button(
                 label="Descargar registros nuevos",
                 data=output.getvalue(),
