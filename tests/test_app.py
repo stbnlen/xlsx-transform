@@ -77,7 +77,7 @@ def test_asig_page_tabs():
     with open(asig_path, "r") as f:
         content = f.read()
 
-    assert 'st.tabs(["Q_BANCO", "Q_CMR", "FORUM", "BCI"])' in content
+    assert '["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "BCI"]' in content
 
     assert "with tab1:" in content
     assert "show_q_banco_view()" in content
@@ -90,6 +90,9 @@ def test_asig_page_tabs():
     assert "def process_forum_data(" in content
     assert "def process_single_file(" in content
     assert "with tab4:" in content
+    assert 'st.header("Flujo FORUM")' in content
+    assert "def process_flujo_forum_data(" in content
+    assert "with tab5:" in content
     assert "show_bci_view()" in content
 
 

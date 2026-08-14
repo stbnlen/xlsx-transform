@@ -34,6 +34,38 @@ def _find_column_insensitive(df: pd.DataFrame, candidates: list[str]) -> str | N
     return None
 
 
+FORUM_COLUMN_ORDER = [
+    "ORIGEN",
+    "CONTRATO",
+    "RUT",
+    "NOMBRE CLIENTE",
+    "MONTO CASTIGO",
+    "ETAPA DEMANDA",
+    "FECHA CASTIGO",
+    "CIUDAD",
+    "CARTERA",
+    "Tipo gestión ",
+    "Año castigo",
+]
+
+
+def _normalize_rut_series(series: pd.Series) -> pd.Series:
+    """Normalize RUT values: keep digits before dash, drop float '.0' suffix."""
+    return (
+        series.astype(str)
+        .str.split("-")
+        .str[0]
+        .str.strip()
+        .str.replace(r"\.0$", "", regex=True)
+    )
+
+
+def _year_from_date_series(series: pd.Series) -> pd.Series:
+    """Extract clean year strings (e.g. '2026') from a date series."""
+    years = pd.to_datetime(series, errors="coerce").dt.year
+    return years.astype("Int64").astype(str).replace("<NA>", "")
+
+
 def process_forum_data(
     df_castigo: pd.DataFrame,
     df_vigente: pd.DataFrame,
@@ -54,22 +86,8 @@ def process_forum_data(
     )
 
     # Reorder columns to match the requested order
-    column_order = [
-        "ORIGEN",  # From filename
-        "CONTRATO",  # From data
-        "RUT",  # From data (cleaned)
-        "NOMBRE CLIENTE",  # From data
-        "MONTO CASTIGO",  # From data
-        "ETAPA DEMANDA",  # Empty column
-        "FECHA CASTIGO",  # From data
-        "CIUDAD",  # Empty column
-        "CARTERA",  # From data
-        "Tipo gestión ",  # Empty column with trailing space
-        "Año castigo",  # Year from FECHA CASTIGO (last column)
-    ]
-
     # Ensure all required columns exist
-    for col in column_order:
+    for col in FORUM_COLUMN_ORDER:
         if col not in combined_df.columns:
             combined_df[col] = ""
 
@@ -79,7 +97,7 @@ def process_forum_data(
             combined_df[col] = combined_df[col].fillna("")
 
     # Return dataframe with columns in the specified order
-    return combined_df[column_order]
+    return combined_df[FORUM_COLUMN_ORDER]
 
 
 def process_single_file(
@@ -164,13 +182,8 @@ def process_single_file(
             "Año castigo" not in processed_df.columns
             and "FECHA CASTIGO" in processed_df.columns
         ):
-            # Convert to datetime and extract year
-            processed_df["Año castigo"] = pd.to_datetime(
-                processed_df["FECHA CASTIGO"], errors="coerce"
-            ).dt.year
-            # Replace NaN values with empty string
-            processed_df["Año castigo"] = (
-                processed_df["Año castigo"].fillna("").astype(str)
+            processed_df["Año castigo"] = _year_from_date_series(
+                processed_df["FECHA CASTIGO"]
             )
         elif "Año castigo" not in processed_df.columns:
             processed_df["Año castigo"] = ""
@@ -237,13 +250,8 @@ def process_single_file(
             "Año castigo" not in processed_df.columns
             and "FECHA CASTIGO" in processed_df.columns
         ):
-            # Convert to datetime and extract year
-            processed_df["Año castigo"] = pd.to_datetime(
-                processed_df["FECHA CASTIGO"], errors="coerce"
-            ).dt.year
-            # Replace NaN values with empty string
-            processed_df["Año castigo"] = (
-                processed_df["Año castigo"].fillna("").astype(str)
+            processed_df["Año castigo"] = _year_from_date_series(
+                processed_df["FECHA CASTIGO"]
             )
         elif "Año castigo" not in processed_df.columns:
             processed_df["Año castigo"] = ""
@@ -251,9 +259,90 @@ def process_single_file(
     return processed_df
 
 
+def process_flujo_file(df_flujo: pd.DataFrame, filename: str) -> pd.DataFrame:
+    """Process a flujo file into the standard FORUM column layout."""
+    processed_df = pd.DataFrame(index=df_flujo.index)
+
+    origen_name = filename.split(".")[0]
+    processed_df["ORIGEN"] = origen_name
+
+    contrato_col = _find_column_insensitive(df_flujo, ["CONTRATO"])
+    processed_df["CONTRATO"] = df_flujo[contrato_col] if contrato_col else ""
+
+    rut_col = _find_column_insensitive(df_flujo, ["RUT", "RUT COMP"])
+    if rut_col:
+        processed_df["RUT"] = _normalize_rut_series(df_flujo[rut_col])
+    else:
+        processed_df["RUT"] = ""
+
+    nombre_col = _find_column_insensitive(
+        df_flujo, ["NOMBRE CLIENTE", "NOMBRE", "Nombre_Cliente", "Demandado"]
+    )
+    processed_df["NOMBRE CLIENTE"] = df_flujo[nombre_col] if nombre_col else ""
+
+    monto_col = _find_column_insensitive(
+        df_flujo,
+        ["MONTO CASTIGO", "Monto Castigo", "SALDO CAPITAL SEMAFORO", "FSALDOINSOLUTO"],
+    )
+    processed_df["MONTO CASTIGO"] = df_flujo[monto_col] if monto_col else ""
+
+    processed_df["ETAPA DEMANDA"] = ""
+
+    fecha_col = _find_column_insensitive(df_flujo, ["FECHA CASTIGO", "Fecha Castigo"])
+    processed_df["FECHA CASTIGO"] = df_flujo[fecha_col] if fecha_col else ""
+
+    processed_df["CIUDAD"] = ""
+
+    cartera_col = _find_column_insensitive(
+        df_flujo, ["CARTERA", "cartera", "Marca Cartera"]
+    )
+    processed_df["CARTERA"] = df_flujo[cartera_col] if cartera_col else ""
+
+    processed_df["Tipo gestión "] = ""
+
+    processed_df["Año castigo"] = _year_from_date_series(processed_df["FECHA CASTIGO"])
+
+    return processed_df
+
+
+def process_flujo_forum_data(
+    df_stock: pd.DataFrame, df_flujo: pd.DataFrame, filename_flujo: str
+) -> tuple[pd.DataFrame, int]:
+    """Append flujo records to stock, skipping RUTs already present in stock.
+
+    Returns the combined dataframe and the count of discarded duplicates.
+    """
+    df_flujo_processed = process_flujo_file(df_flujo, filename_flujo)
+
+    stock_ruts: set[str] = set()
+    if "RUT" in df_stock.columns:
+        stock_ruts = set(_normalize_rut_series(df_stock["RUT"]))
+        stock_ruts.discard("")
+        stock_ruts.discard("nan")
+
+    mask_new = ~df_flujo_processed["RUT"].isin(stock_ruts)
+    discarded_count = int((~mask_new).sum())
+
+    combined_df = pd.concat(
+        [df_stock.copy(), df_flujo_processed[mask_new]], ignore_index=True
+    )
+
+    for col in FORUM_COLUMN_ORDER:
+        if col not in combined_df.columns:
+            combined_df[col] = ""
+
+    for col in ["ETAPA DEMANDA", "CIUDAD", "Tipo gestión "]:
+        if col in combined_df.columns:
+            combined_df[col] = combined_df[col].fillna("")
+
+    return combined_df[FORUM_COLUMN_ORDER], discarded_count
+
+
 st.title("Asignaciones")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Q_BANCO", "Q_CMR", "FORUM", "BCI"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "BCI"]
+)
 
 with tab1:
     st.header("Q_BANCO")
@@ -354,5 +443,101 @@ with tab3:
             st.error(f"Error al leer el archivo: {e}")
     else:
         st.info("Carga ambos archivos, Castigo y Vigente, para continuar.")
+
 with tab4:
+    st.header("Flujo FORUM")
+    st.write(
+        "Une los registros de un archivo de flujo al stock generado en la pestaña "
+        "FORUM. Los registros cuyo RUT ya existe en el stock se descartan."
+    )
+
+    stock_file = st.file_uploader(
+        "Selecciona el archivo Stock (resultado de la pestaña FORUM)",
+        type=["xlsx", "xls"],
+        key="flujo_forum_stock",
+    )
+    flujo_file = st.file_uploader(
+        "Selecciona el archivo Flujo",
+        type=["xlsx", "xls"],
+        key="flujo_forum_flujo",
+    )
+
+    if stock_file is not None and flujo_file is not None:
+        st.success("Ambos archivos se cargaron correctamente.")
+
+        try:
+            df_stock = pd.read_excel(stock_file)
+            df_flujo = pd.read_excel(flujo_file)
+
+            st.write("Vista previa del archivo Stock:")
+            st.dataframe(df_stock.head().astype(str))
+
+            st.write("Vista previa del archivo Flujo:")
+            st.dataframe(df_flujo.head().astype(str))
+
+            combined_df, discarded_count = process_flujo_forum_data(
+                df_stock, df_flujo, flujo_file.name
+            )
+            accepted_count = len(df_flujo) - discarded_count
+
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("Registros en el flujo", len(df_flujo))
+            col_b.metric("Aceptados (RUT nuevo)", accepted_count)
+            col_c.metric("Descartados (RUT en stock)", discarded_count)
+
+            st.write(
+                f"Stock final: {len(combined_df)} registros "
+                f"(stock original: {len(df_stock)})."
+            )
+
+            display_combined = combined_df.copy()
+            for col in display_combined.columns:
+                if display_combined[col].dtype == "object":
+                    display_combined[col] = display_combined[col].astype(str)
+            st.dataframe(display_combined)
+
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                combined_df.to_excel(writer, sheet_name="Anexar1", index=False)
+            excel_data = output.getvalue()
+
+            ahora = datetime.now()
+            dia_actual = ahora.day
+            mes_actual = MESES_ESPANOL[ahora.month]
+            anio_actual = ahora.year
+            nombre_archivo = f"FRM_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+
+            st.download_button(
+                label="Descargar stock actualizado como XLSX",
+                data=excel_data,
+                file_name=nombre_archivo,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+        except Exception as e:
+            st.error(f"Error al procesar los archivos: {e}")
+            st.info(
+                "Asegúrate de que el archivo de flujo tenga las columnas requeridas: "
+                "CONTRATO, RUT, NOMBRE, MONTO CASTIGO"
+            )
+    elif stock_file is not None:
+        st.info("Carga el archivo Flujo para continuar.")
+        try:
+            df_stock_preview = pd.read_excel(stock_file)
+            st.write("Vista previa del archivo Stock:")
+            st.dataframe(df_stock_preview.head())
+        except Exception as e:
+            st.error(f"Error al leer el archivo: {e}")
+    elif flujo_file is not None:
+        st.info("Carga el archivo Stock para continuar.")
+        try:
+            df_flujo_preview = pd.read_excel(flujo_file)
+            st.write("Vista previa del archivo Flujo:")
+            st.dataframe(df_flujo_preview.head())
+        except Exception as e:
+            st.error(f"Error al leer el archivo: {e}")
+    else:
+        st.info("Carga ambos archivos, Stock y Flujo, para continuar.")
+
+with tab5:
     show_bci_view()
