@@ -266,10 +266,10 @@ def process_flujo_file(df_flujo: pd.DataFrame, filename: str) -> pd.DataFrame:
     origen_name = filename.split(".")[0]
     processed_df["ORIGEN"] = origen_name
 
-    contrato_col = _find_column_insensitive(df_flujo, ["CONTRATO"])
+    contrato_col = _find_column_insensitive(df_flujo, ["CONTRATO", "CONTRATO RS"])
     processed_df["CONTRATO"] = df_flujo[contrato_col] if contrato_col else ""
 
-    rut_col = _find_column_insensitive(df_flujo, ["RUT", "RUT COMP"])
+    rut_col = _find_column_insensitive(df_flujo, ["RUT", "RUT CLIENTE", "RUT COMP"])
     if rut_col:
         processed_df["RUT"] = _normalize_rut_series(df_flujo[rut_col])
     else:

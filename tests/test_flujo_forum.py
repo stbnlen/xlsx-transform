@@ -89,6 +89,34 @@ def test_process_flujo_file_case_insensitive():
     assert result["Año castigo"].tolist() == ["2026"]
 
 
+def test_process_flujo_file_real_column_names():
+    """Flujo files with 'RUT CLIENTE' and 'CONTRATO RS' columns are mapped."""
+    df_flujo = pd.DataFrame(
+        {
+            "CONTRATO RS": ["F001", "F002"],
+            "RUT CLIENTE": ["20123456-2", "19513991-1"],
+            "NOMBRE": ["María González", "Juan Pérez"],
+            "MONTO CASTIGO": [2200000, 1500000],
+        }
+    )
+
+    result = process_flujo_file(df_flujo, "flujo.xlsx")
+
+    assert result["CONTRATO"].tolist() == ["F001", "F002"]
+    assert result["RUT"].tolist() == ["20123456", "19513991"]
+
+    df_stock = create_sample_stock()
+    combined_df, discarded_count = process_flujo_forum_data(
+        df_stock, df_flujo, "flujo.xlsx"
+    )
+
+    # 19513991 is already in the stock, so only one record is accepted
+    assert discarded_count == 1
+    assert len(combined_df) == len(df_stock) + 1
+    assert combined_df.iloc[-1]["CONTRATO"] == "F001"
+    assert combined_df.iloc[-1]["RUT"] == "20123456"
+
+
 def test_process_flujo_forum_data_appends_new_ruts():
     """Flujo records with new RUTs are appended to the stock."""
     df_stock = create_sample_stock()
