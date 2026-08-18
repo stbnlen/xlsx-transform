@@ -7,6 +7,7 @@ import streamlit as st
 from pagos_bci import show_bci_view
 from q_banco import show_q_banco_view
 from q_cmr import show_q_cmr_view
+from utils import validate_required_columns
 
 MESES_ESPANOL = {
     1: "ene",
@@ -46,6 +47,17 @@ FORUM_COLUMN_ORDER = [
     "CARTERA",
     "Tipo gestión ",
     "Año castigo",
+]
+
+COP_STOCK_COLUMNS = [
+    "RUT COM",
+    "DV",
+    "AISNACION",
+    "Demandado",
+    "SALDO DEUDOR RUT COMPLETO",
+    "ESTADO CRM",
+    "Flujo/Stock",
+    "FF",
 ]
 
 
@@ -340,8 +352,8 @@ def process_flujo_forum_data(
 
 st.title("Asignaciones")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "BCI"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "Flujo COP", "BCI"]
 )
 
 with tab1:
@@ -540,4 +552,55 @@ with tab4:
         st.info("Carga ambos archivos, Stock y Flujo, para continuar.")
 
 with tab5:
+    st.header("Flujo COP")
+    st.write(
+        "Une los registros de un archivo de flujo al stock de COP. "
+        "Carga ambos archivos para ver sus vistas previas."
+    )
+
+    cop_stock_file = st.file_uploader(
+        "Selecciona el archivo Stock",
+        type=["xlsx", "xls"],
+        key="flujo_cop_stock",
+    )
+    cop_flujo_file = st.file_uploader(
+        "Selecciona el archivo Flujo",
+        type=["xlsx", "xls"],
+        key="flujo_cop_flujo",
+    )
+
+    if cop_stock_file is not None and cop_flujo_file is not None:
+        st.success("Ambos archivos se cargaron correctamente.")
+
+    if cop_stock_file is not None:
+        try:
+            df_cop_stock = pd.read_excel(cop_stock_file)
+            st.write("Vista previa del archivo Stock:")
+            st.dataframe(df_cop_stock.head().astype(str))
+
+            missing_columns, _ = validate_required_columns(
+                df_cop_stock.columns, COP_STOCK_COLUMNS
+            )
+            if missing_columns:
+                st.warning(
+                    "Columnas esperadas no encontradas en el stock: "
+                    + ", ".join(missing_columns)
+                )
+            else:
+                st.success("El archivo Stock tiene todas las columnas esperadas.")
+        except Exception as e:
+            st.error(f"Error al leer el archivo Stock: {e}")
+
+    if cop_flujo_file is not None:
+        try:
+            df_cop_flujo = pd.read_excel(cop_flujo_file)
+            st.write("Vista previa del archivo Flujo:")
+            st.dataframe(df_cop_flujo.head().astype(str))
+        except Exception as e:
+            st.error(f"Error al leer el archivo Flujo: {e}")
+
+    if cop_stock_file is None and cop_flujo_file is None:
+        st.info("Carga ambos archivos, Stock y Flujo, para continuar.")
+
+with tab6:
     show_bci_view()
