@@ -95,6 +95,7 @@ def test_asig_page_tabs():
     assert "with tab5:" in content
     assert 'st.header("Flujo COP")' in content
     assert "COP_STOCK_COLUMNS" in content
+    assert "def read_cop_stock_file(" in content
     assert "with tab6:" in content
     assert "show_bci_view()" in content
 

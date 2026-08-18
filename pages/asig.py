@@ -350,6 +350,19 @@ def process_flujo_forum_data(
     return combined_df[FORUM_COLUMN_ORDER], discarded_count
 
 
+COP_STOCK_SHEET = "Hoja2"
+
+
+def read_cop_stock_file(file: io.BytesIO) -> pd.DataFrame:
+    """Read COP stock data from the 'Hoja2' sheet of the Excel file."""
+    try:
+        return pd.read_excel(file, sheet_name=COP_STOCK_SHEET)
+    except ValueError as e:
+        raise ValueError(
+            f"El archivo Stock no contiene la hoja '{COP_STOCK_SHEET}'"
+        ) from e
+
+
 st.title("Asignaciones")
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
@@ -555,6 +568,7 @@ with tab5:
     st.header("Flujo COP")
     st.write(
         "Une los registros de un archivo de flujo al stock de COP. "
+        "El stock se lee desde la hoja 'Hoja2' del archivo. "
         "Carga ambos archivos para ver sus vistas previas."
     )
 
@@ -574,8 +588,8 @@ with tab5:
 
     if cop_stock_file is not None:
         try:
-            df_cop_stock = pd.read_excel(cop_stock_file)
-            st.write("Vista previa del archivo Stock:")
+            df_cop_stock = read_cop_stock_file(cop_stock_file)
+            st.write("Vista previa del archivo Stock (hoja 'Hoja2'):")
             st.dataframe(df_cop_stock.head().astype(str))
 
             missing_columns, _ = validate_required_columns(
