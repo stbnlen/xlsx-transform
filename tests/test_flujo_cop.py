@@ -18,9 +18,10 @@ def test_cop_stock_columns_schema():
     assert COP_STOCK_COLUMNS == [
         "RUT COM",
         "DV",
-        "AISNACION",
+        "AISGNACION",
         "Demandado",
-        "SALDO DEUDOR RUT COMPLETO",
+        "SALDO DEUDOR",
+        "RUT COMPLETO",
         "ESTADO CRM",
         "Flujo/Stock",
         "FF",
@@ -34,8 +35,9 @@ def test_cop_stock_validation_detects_missing_columns():
     missing, mapping = validate_required_columns(df.columns, COP_STOCK_COLUMNS)
 
     assert set(missing) == {
-        "AISNACION",
-        "SALDO DEUDOR RUT COMPLETO",
+        "AISGNACION",
+        "SALDO DEUDOR",
+        "RUT COMPLETO",
         "ESTADO CRM",
         "Flujo/Stock",
         "FF",
@@ -49,9 +51,10 @@ def test_cop_stock_validation_matches_case_insensitive():
         columns=[
             "rut com",
             " DV ",
-            "aisnacion",
+            "aisgnacion",
             "DEMANDADO",
-            "saldo deudor rut completo",
+            "saldo deudor",
+            "rut completo",
             "estado crm",
             "flujo/stock",
             "ff",
@@ -71,9 +74,10 @@ def _build_stock_workbook(sheet_names: list[str], data_sheet: str) -> io.BytesIO
         {
             "RUT COM": ["19513991", "22345678"],
             "DV": ["1", "9"],
-            "AISNACION": ["A1", "A2"],
+            "AISGNACION": ["A1", "A2"],
             "Demandado": ["Juan Pérez", "Ana Ruiz"],
-            "SALDO DEUDOR RUT COMPLETO": [1500000, 0],
+            "SALDO DEUDOR": [1500000, 0],
+            "RUT COMPLETO": ["19513991-1", "22345678-9"],
             "ESTADO CRM": ["Activo", "Inactivo"],
             "Flujo/Stock": ["Stock", "Stock"],
             "FF": ["2026-01-15", "2026-02-20"],

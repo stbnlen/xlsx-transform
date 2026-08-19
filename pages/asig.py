@@ -52,9 +52,10 @@ FORUM_COLUMN_ORDER = [
 COP_STOCK_COLUMNS = [
     "RUT COM",
     "DV",
-    "AISNACION",
+    "AISGNACION",
     "Demandado",
-    "SALDO DEUDOR RUT COMPLETO",
+    "SALDO DEUDOR",
+    "RUT COMPLETO",
     "ESTADO CRM",
     "Flujo/Stock",
     "FF",
@@ -74,8 +75,8 @@ def _normalize_rut_series(series: pd.Series) -> pd.Series:
 
 def _year_from_date_series(series: pd.Series) -> pd.Series:
     """Extract clean year strings (e.g. '2026') from a date series."""
-    years = pd.to_datetime(series, errors="coerce").dt.year
-    return years.astype("Int64").astype(str).replace("<NA>", "")
+    dates = pd.to_datetime(series, errors="coerce")
+    return dates.dt.strftime("%Y").fillna("")
 
 
 def process_forum_data(
@@ -343,7 +344,7 @@ def process_flujo_forum_data(
         if col not in combined_df.columns:
             combined_df[col] = ""
 
-    for col in ["ETAPA DEMANDA", "CIUDAD", "Tipo gestión "]:
+    for col in ["ETAPA DEMANDA", "CIUDAD", "Tipo gestión ", "Año castigo"]:
         if col in combined_df.columns:
             combined_df[col] = combined_df[col].fillna("")
 
