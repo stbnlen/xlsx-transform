@@ -36,6 +36,15 @@ def _find_column_insensitive(df: pd.DataFrame, candidates: list[str]) -> str | N
     return None
 
 
+def _find_column_by_prefix(df: pd.DataFrame, prefix: str) -> str | None:
+    """Find the first column whose name starts with prefix (case-insensitive)."""
+    key = prefix.strip().lower()
+    for col in df.columns:
+        if str(col).strip().lower().startswith(key):
+            return col
+    return None
+
+
 FORUM_COLUMN_ORDER = [
     "ORIGEN",
     "CONTRATO",
@@ -296,8 +305,16 @@ def process_flujo_file(df_flujo: pd.DataFrame, filename: str) -> pd.DataFrame:
 
     monto_col = _find_column_insensitive(
         df_flujo,
-        ["MONTO CASTIGO", "Monto Castigo", "SALDO CAPITAL SEMAFORO", "FSALDOINSOLUTO"],
+        [
+            "MONTO CASTIGO",
+            "SALDO CAPITAL SEMAFORO",
+            "FSALDOINSOLUTO",
+            "SALDO INSOLUTO",
+            "SALDO INS",
+        ],
     )
+    if monto_col is None:
+        monto_col = _find_column_by_prefix(df_flujo, "saldo ins")
     processed_df["MONTO CASTIGO"] = df_flujo[monto_col] if monto_col else ""
 
     processed_df["ETAPA DEMANDA"] = ""

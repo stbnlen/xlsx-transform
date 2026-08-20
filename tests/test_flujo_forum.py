@@ -121,6 +121,27 @@ def test_process_flujo_file_case_insensitive():
     assert result["Año castigo"].tolist() == ["2026"]
 
 
+def test_process_flujo_file_monto_from_saldo_insoluto():
+    """MONTO CASTIGO is resolved from 'SALDO INS', 'SALDO INSOLUTO' and variants."""
+    base = {
+        "CONTRATO": ["F001"],
+        "RUT": ["20123456-2"],
+        "NOMBRE": ["María González"],
+    }
+
+    df_exact = pd.DataFrame({**base, "SALDO INSOLUTO": [2200000]})
+    result = process_flujo_file(df_exact, "flujo.xlsx")
+    assert result["MONTO CASTIGO"].tolist() == [2200000]
+
+    df_short = pd.DataFrame({**base, "SALDO INS": [2500000]})
+    result = process_flujo_file(df_short, "flujo.xlsx")
+    assert result["MONTO CASTIGO"].tolist() == [2500000]
+
+    df_variant = pd.DataFrame({**base, "Saldo Insoluto Final": [3300000]})
+    result = process_flujo_file(df_variant, "flujo.xlsx")
+    assert result["MONTO CASTIGO"].tolist() == [3300000]
+
+
 def test_process_flujo_file_real_column_names():
     """Flujo files with 'RUT CLIENTE' and 'CONTRATO RS' columns are mapped."""
     df_flujo = pd.DataFrame(
