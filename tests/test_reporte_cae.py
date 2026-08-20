@@ -40,8 +40,8 @@ def create_sample_cae() -> pd.DataFrame:
     )
 
 
-def test_append_new_records_preserves_pivot_and_adds_sheet():
-    """The combined download keeps the original pivot parts and adds a new sheet."""
+def test_append_new_records_to_main_sheet():
+    """New records are appended to the main data sheet, pivot parts preserved."""
     df_actual = create_sample_cae()
     df_actual["Llave"] = df_actual["OPERACION"] + df_actual["ETAPA SATCHMO"]
 
@@ -67,20 +67,26 @@ def test_append_new_records_preserves_pivot_and_adds_sheet():
         assert "pivotCacheRecords+xml" in content_types
         assert "pivotTable+xml" in content_types
 
-        # Three sheets: original report, DATOS, Hoja1, plus new records
+        # Sheets: original report, DATOS, Hoja1 - NO new REGISTROS_NUEVOS sheet
         wb = openpyxl.load_workbook(io.BytesIO(data))
         assert "REPORTES_GESTIONES_TODAS_ETAPAS" in wb.sheetnames
         assert "DATOS" in wb.sheetnames
         assert "Hoja1" in wb.sheetnames
-        assert "REGISTROS_NUEVOS" in wb.sheetnames
+        assert "REGISTROS_NUEVOS" not in wb.sheetnames
 
-        # New records sheet has the data
-        nuevos = pd.read_excel(io.BytesIO(data), sheet_name="REGISTROS_NUEVOS")
-        assert len(nuevos) == 2
-        assert "OPERACION" in nuevos.columns
-        assert "ETAPA SATCHMO" in nuevos.columns
-        assert "Mes" in nuevos.columns
-        assert "PRODUCTO" in nuevos.columns
+        # Main sheet has original (2) + new (2) = 4 records
+        main_sheet = pd.read_excel(
+            io.BytesIO(data), sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS"
+        )
+        assert len(main_sheet) == 4
+        assert "OPERACION" in main_sheet.columns
+        assert "ETAPA SATCHMO" in main_sheet.columns
+        assert "Mes" in main_sheet.columns
+        assert "PRODUCTO" in main_sheet.columns
+
+        # Verify new records were appended
+        new_records = main_sheet.tail(2)
+        assert new_records["OPERACION"].astype(str).tolist() == ["1", "2"]
 
 
 def test_write_cae_nuevos_excel_single_sheet():
@@ -96,7 +102,7 @@ def test_write_cae_nuevos_excel_single_sheet():
 
 
 def test_append_new_records_without_pivot_fallback():
-    """If the uploaded file has no pivot parts, the fallback still works."""
+    """If the uploaded file has no pivot parts, the fallback still works (appends to main sheet)."""
     df_actual = create_sample_cae()
     df_actual["Llave"] = df_actual["OPERACION"] + df_actual["ETAPA SATCHMO"]
     df_nuevos = df_actual.head(2)
@@ -129,10 +135,11 @@ def test_append_new_records_without_pivot_fallback():
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         names = set(zf.namelist())
         assert "xl/pivotTables/pivotTable1.xml" not in names  # no pivot created
-        assert "REGISTROS_NUEVOS" in [
-            s.get("name")
-            for s in ET.fromstring(
-                zipfile.ZipFile(io.BytesIO(data)).read("xl/workbook.xml")
-            ).iter()
-            if s.tag.endswith("}sheet")
-        ]
+
+        # Only REPORT_SHEET exists, no REGISTROS_NUEVOS sheet
+        wb = openpyxl.load_workbook(io.BytesIO(data))
+        assert wb.sheetnames == ["REPORTES_GESTIONES_TODAS_ETAPAS"]
+        main_sheet = pd.read_excel(
+            io.BytesIO(data), sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS"
+        )
+        assert len(main_sheet) == 6  # 4 original + 2 new

@@ -1,5 +1,6 @@
 import io
 
+import openpyxl
 import pandas as pd
 import streamlit as st
 from openpyxl.utils import get_column_letter
@@ -68,20 +69,33 @@ def write_cae_nuevos_excel(df_nuevos: pd.DataFrame) -> bytes:
 
 
 def append_new_records_to_report(report_bytes: bytes, df_nuevos: pd.DataFrame) -> bytes:
-    """Append the new records to the current report workbook.
-
-    The original workbook is kept as-is (including its sheets and the native
-    pivot table on 'Hoja3'); the new records are added as a new sheet.
+    """Append new records to the main data sheet (REPORTES_GESTIONES_TODAS_ETAPAS)
+    so the existing pivot table (Hoja3) reflects them when refreshed.
     """
-    output = io.BytesIO(report_bytes)
-    with pd.ExcelWriter(
-        output, engine="openpyxl", mode="a", if_sheet_exists="replace"
-    ) as writer:
-        df_nuevos.to_excel(writer, sheet_name=NEW_RECORDS_SHEET, index=False)
-        # Use a distinct table name to avoid collision with existing tables
-        _add_formatted_table(
-            writer.sheets[NEW_RECORDS_SHEET], df_nuevos, "RegistrosNuevosAppended"
-        )
+    wb = openpyxl.load_workbook(io.BytesIO(report_bytes))
+    ws = wb[REPORT_SHEET]
+
+    # Find the table in the main sheet
+    table = None
+    if ws._tables:
+        table = next(iter(ws._tables.values()))
+
+    # Find the last row with data
+    start_row = ws.max_row + 1
+
+    # Write new records
+    for row_idx, row in enumerate(df_nuevos.itertuples(index=False), start=start_row):
+        for col_idx, value in enumerate(row, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=value)
+
+    # Update the table range if a table exists
+    if table is not None:
+        end_col = get_column_letter(len(df_nuevos.columns))
+        end_row = ws.max_row
+        table.ref = f"A1:{end_col}{end_row}"
+
+    output = io.BytesIO()
+    wb.save(output)
     return output.getvalue()
 
 
