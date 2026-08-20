@@ -6,6 +6,73 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 REPORT_SHEET = "REPORTES_GESTIONES_TODAS_ETAPAS"
+PIVOT_SHEET = "Hoja1"
+
+
+def _find_cae_column(df: pd.DataFrame, name: str):
+    """Find a column by case-insensitive, whitespace-trimmed name."""
+    target = str(name).strip().lower()
+    for col in df.columns:
+        if str(col).strip().lower() == target:
+            return col
+    return None
+
+
+def build_cae_pivot(df: pd.DataFrame) -> pd.DataFrame:
+    """Build a pivot: rows=ETAPA SATCHMO, columns=Mes, values=count of PRODUCTO.
+
+    Raises KeyError listing any required column that is missing.
+    """
+    mes_col = _find_cae_column(df, "Mes")
+    etapa_col = _find_cae_column(df, "ETAPA SATCHMO")
+    producto_col = _find_cae_column(df, "PRODUCTO")
+    missing = [
+        label
+        for label, col in (
+            ("Mes", mes_col),
+            ("ETAPA SATCHMO", etapa_col),
+            ("PRODUCTO", producto_col),
+        )
+        if col is None
+    ]
+    if missing:
+        raise KeyError("Columnas faltantes: " + ", ".join(missing))
+    return pd.pivot_table(
+        df,
+        index=etapa_col,
+        columns=mes_col,
+        values=producto_col,
+        aggfunc="count",
+        fill_value=0,
+    )
+
+
+def write_cae_pivot_excel(pivot: pd.DataFrame) -> bytes:
+    """Write the pivot to an in-memory xlsx with a 'Hoja1' sheet, return bytes."""
+    pivot_flat = pivot.reset_index()
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        pivot_flat.to_excel(writer, sheet_name=PIVOT_SHEET, index=False)
+        ws = writer.sheets[PIVOT_SHEET]
+        end_col = get_column_letter(len(pivot_flat.columns))
+        end_row = len(pivot_flat) + 1
+        table = Table(displayName="TablaDinamica", ref=f"A1:{end_col}{end_row}")
+        table.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium7",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        ws.add_table(table)
+        for idx, column in enumerate(pivot_flat.columns, start=1):
+            width = max(
+                len(str(column)),
+                int(pivot_flat[column].astype(str).str.len().max()),
+            )
+            ws.column_dimensions[get_column_letter(idx)].width = min(width + 2, 255)
+    return output.getvalue()
+
 
 st.title("Reporte CAE")
 
@@ -152,3 +219,31 @@ if df_anterior is not None and df_actual is not None:
         )
 elif file_anterior is not None or file_actual is not None:
     st.info("Carga ambos reportes para comparar y detectar registros nuevos.")
+
+if df_actual is not None:
+    st.divider()
+    st.subheader("Tabla dinámica del reporte actual")
+    st.caption("Filas: ETAPA SATCHMO · Columnas: Mes · Valores: recuento de PRODUCTO.")
+    try:
+        pivot_cae = build_cae_pivot(df_actual)
+        if pivot_cae.empty:
+            st.info("El reporte actual no tiene datos para la tabla dinámica.")
+        else:
+            st.dataframe(pivot_cae)
+            st.download_button(
+                label="Descargar tabla dinámica (Hoja1)",
+                data=write_cae_pivot_excel(pivot_cae),
+                file_name="tabla_dinamica_cae.xlsx",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
+            )
+    except KeyError as e:
+        st.error(f"Error al generar la tabla dinámica: {e}")
+        st.info(
+            "El reporte actual debe contener las columnas 'Mes', "
+            "'ETAPA SATCHMO' y 'PRODUCTO'."
+        )
+    except Exception as e:
+        st.error(f"Error al generar la tabla dinámica: {e}")
