@@ -10,8 +10,11 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pages.reporte_cae import (  # noqa: E402
+    PIVOT_SHEET,
+    REPORT_SHEET,
     build_cae_pivot,
-    write_cae_pivot_excel,
+    write_cae_combined_excel,
+    write_cae_nuevos_excel,
 )
 
 
@@ -51,12 +54,34 @@ def test_build_cae_pivot_case_insensitive():
     assert pivot.loc["Etapa1", "ene"] == 2
 
 
-def test_write_cae_pivot_excel_creates_hoja1():
-    """The download bytes contain a 'Hoja1' sheet with the pivot data."""
-    pivot = build_cae_pivot(create_sample_cae())
-    data = write_cae_pivot_excel(pivot)
+def test_write_cae_combined_excel_creates_both_sheets():
+    """The combined download has the new records and the 'Hoja1' pivot."""
+    df_actual = create_sample_cae()
+    pivot = build_cae_pivot(df_actual)
+    df_nuevos = df_actual.head(2)
 
-    result = pd.read_excel(io.BytesIO(data), sheet_name="Hoja1")
-    assert result.columns[0] == "ETAPA SATCHMO"
-    assert set(result.columns[1:]) == {"ene", "feb"}
-    assert len(result) == 2
+    data = write_cae_combined_excel(df_nuevos, pivot)
+    sheets = pd.read_excel(io.BytesIO(data), sheet_name=None)
+
+    assert set(sheets.keys()) == {REPORT_SHEET, PIVOT_SHEET}
+
+    nuevos = sheets[REPORT_SHEET]
+    assert len(nuevos) == 2
+    assert "ETAPA SATCHMO" in nuevos.columns
+
+    pivot_sheet = sheets[PIVOT_SHEET]
+    assert pivot_sheet.columns[0] == "ETAPA SATCHMO"
+    assert set(pivot_sheet.columns[1:]) == {"ene", "feb"}
+    assert len(pivot_sheet) == 2
+
+
+def test_write_cae_nuevos_excel_single_sheet():
+    """The new-records-only download keeps a single REPORT_SHEET sheet."""
+    df_actual = create_sample_cae()
+    df_nuevos = df_actual.head(3)
+
+    data = write_cae_nuevos_excel(df_nuevos)
+    sheets = pd.read_excel(io.BytesIO(data), sheet_name=None)
+
+    assert set(sheets.keys()) == {REPORT_SHEET}
+    assert len(sheets[REPORT_SHEET]) == 3

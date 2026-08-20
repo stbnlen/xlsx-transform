@@ -47,30 +47,45 @@ def build_cae_pivot(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def write_cae_pivot_excel(pivot: pd.DataFrame) -> bytes:
-    """Write the pivot to an in-memory xlsx with a 'Hoja1' sheet, return bytes."""
-    pivot_flat = pivot.reset_index()
+def _add_formatted_table(ws, df: pd.DataFrame, display_name: str) -> None:
+    """Add a styled Excel table over the df range and autofit column widths."""
+    end_col = get_column_letter(len(df.columns))
+    end_row = len(df) + 1
+    table = Table(displayName=display_name, ref=f"A1:{end_col}{end_row}")
+    table.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium7",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False,
+    )
+    ws.add_table(table)
+    for idx, column in enumerate(df.columns, start=1):
+        width = max(
+            len(str(column)),
+            int(df[column].astype(str).str.len().max()),
+        )
+        ws.column_dimensions[get_column_letter(idx)].width = min(width + 2, 255)
+
+
+def write_cae_nuevos_excel(df_nuevos: pd.DataFrame) -> bytes:
+    """Write new records to an xlsx (REPORT_SHEET) and return the bytes."""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_nuevos.to_excel(writer, sheet_name=REPORT_SHEET, index=False)
+        _add_formatted_table(writer.sheets[REPORT_SHEET], df_nuevos, "RegistrosNuevos")
+    return output.getvalue()
+
+
+def write_cae_combined_excel(df_nuevos: pd.DataFrame, pivot: pd.DataFrame) -> bytes:
+    """Write new records plus the pivot table (Hoja1) to one xlsx."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_nuevos.to_excel(writer, sheet_name=REPORT_SHEET, index=False)
+        _add_formatted_table(writer.sheets[REPORT_SHEET], df_nuevos, "RegistrosNuevos")
+        pivot_flat = pivot.reset_index()
         pivot_flat.to_excel(writer, sheet_name=PIVOT_SHEET, index=False)
-        ws = writer.sheets[PIVOT_SHEET]
-        end_col = get_column_letter(len(pivot_flat.columns))
-        end_row = len(pivot_flat) + 1
-        table = Table(displayName="TablaDinamica", ref=f"A1:{end_col}{end_row}")
-        table.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium7",
-            showFirstColumn=False,
-            showLastColumn=False,
-            showRowStripes=True,
-            showColumnStripes=False,
-        )
-        ws.add_table(table)
-        for idx, column in enumerate(pivot_flat.columns, start=1):
-            width = max(
-                len(str(column)),
-                int(pivot_flat[column].astype(str).str.len().max()),
-            )
-            ws.column_dimensions[get_column_letter(idx)].width = min(width + 2, 255)
+        _add_formatted_table(writer.sheets[PIVOT_SHEET], pivot_flat, "TablaDinamica")
     return output.getvalue()
 
 
@@ -181,33 +196,31 @@ if df_anterior is not None and df_actual is not None:
         if df_nuevos.empty:
             st.info("No hay registros nuevos entre ambos reportes.")
         else:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_nuevos.to_excel(writer, sheet_name=REPORT_SHEET, index=False)
-                ws = writer.sheets[REPORT_SHEET]
-                end_col = get_column_letter(len(df_nuevos.columns))
-                end_row = len(df_nuevos) + 1
-                table_ref = f"A1:{end_col}{end_row}"
-                table = Table(displayName="RegistrosNuevos", ref=table_ref)
-                table.tableStyleInfo = TableStyleInfo(
-                    name="TableStyleMedium7",
-                    showFirstColumn=False,
-                    showLastColumn=False,
-                    showRowStripes=True,
-                    showColumnStripes=False,
+            pivot_cae = None
+            try:
+                pivot_cae = build_cae_pivot(df_actual)
+            except KeyError as e:
+                st.warning(
+                    f"No se pudo generar la tabla dinámica ({e}); el archivo "
+                    "solo contendrá los registros nuevos. Verifica que el "
+                    "reporte actual tenga las columnas 'Mes', 'ETAPA SATCHMO' "
+                    "y 'PRODUCTO'."
                 )
-                ws.add_table(table)
-                for idx, column in enumerate(df_nuevos.columns, start=1):
-                    width = max(
-                        len(str(column)),
-                        int(df_nuevos[column].astype(str).str.len().max()),
-                    )
-                    ws.column_dimensions[get_column_letter(idx)].width = min(
-                        width + 2, 255
-                    )
+
+            if pivot_cae is not None:
+                st.subheader("Tabla dinámica del reporte actual (Hoja1)")
+                st.caption(
+                    "Filas: ETAPA SATCHMO · Columnas: Mes · "
+                    "Valores: recuento de PRODUCTO."
+                )
+                st.dataframe(pivot_cae)
+                excel_bytes = write_cae_combined_excel(df_nuevos, pivot_cae)
+            else:
+                excel_bytes = write_cae_nuevos_excel(df_nuevos)
+
             st.download_button(
                 label="Descargar registros nuevos",
-                data=output.getvalue(),
+                data=excel_bytes,
                 file_name="registros_nuevos_cae.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
@@ -219,31 +232,3 @@ if df_anterior is not None and df_actual is not None:
         )
 elif file_anterior is not None or file_actual is not None:
     st.info("Carga ambos reportes para comparar y detectar registros nuevos.")
-
-if df_actual is not None:
-    st.divider()
-    st.subheader("Tabla dinámica del reporte actual")
-    st.caption("Filas: ETAPA SATCHMO · Columnas: Mes · Valores: recuento de PRODUCTO.")
-    try:
-        pivot_cae = build_cae_pivot(df_actual)
-        if pivot_cae.empty:
-            st.info("El reporte actual no tiene datos para la tabla dinámica.")
-        else:
-            st.dataframe(pivot_cae)
-            st.download_button(
-                label="Descargar tabla dinámica (Hoja1)",
-                data=write_cae_pivot_excel(pivot_cae),
-                file_name="tabla_dinamica_cae.xlsx",
-                mime=(
-                    "application/vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet"
-                ),
-            )
-    except KeyError as e:
-        st.error(f"Error al generar la tabla dinámica: {e}")
-        st.info(
-            "El reporte actual debe contener las columnas 'Mes', "
-            "'ETAPA SATCHMO' y 'PRODUCTO'."
-        )
-    except Exception as e:
-        st.error(f"Error al generar la tabla dinámica: {e}")
