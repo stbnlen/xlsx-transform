@@ -5,11 +5,10 @@ import streamlit as st
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from pivot_builder import add_native_pivot
-
 REPORT_SHEET = "REPORTES_GESTIONES_TODAS_ETAPAS"
 PIVOT_SHEET = "Hoja1"
 DATA_SHEET = "DATOS"
+NEW_RECORDS_SHEET = "REGISTROS_NUEVOS"
 
 
 def _find_cae_column(df: pd.DataFrame, name: str):
@@ -36,22 +35,6 @@ def resolve_cae_pivot_columns(df: pd.DataFrame) -> dict:
     if missing:
         raise KeyError("Columnas faltantes: " + ", ".join(missing))
     return resolved
-
-
-def build_cae_pivot(df: pd.DataFrame) -> pd.DataFrame:
-    """Build a preview pivot: rows=ETAPA SATCHMO, columns=Mes, values=count.
-
-    Raises KeyError listing any required column that is missing.
-    """
-    cols = resolve_cae_pivot_columns(df)
-    return pd.pivot_table(
-        df,
-        index=cols["ETAPA SATCHMO"],
-        columns=cols["Mes"],
-        values=cols["PRODUCTO"],
-        aggfunc="count",
-        fill_value=0,
-    )
 
 
 def _add_formatted_table(ws, df: pd.DataFrame, display_name: str) -> None:
@@ -84,16 +67,34 @@ def write_cae_nuevos_excel(df_nuevos: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 
+def append_new_records_to_report(report_bytes: bytes, df_nuevos: pd.DataFrame) -> bytes:
+    """Append the new records to the current report workbook.
+
+    The original workbook is kept as-is (including its sheets and the native
+    pivot table on 'Hoja3'); the new records are added as a new sheet.
+    """
+    output = io.BytesIO(report_bytes)
+    with pd.ExcelWriter(
+        output, engine="openpyxl", mode="a", if_sheet_exists="replace"
+    ) as writer:
+        df_nuevos.to_excel(writer, sheet_name=NEW_RECORDS_SHEET, index=False)
+        # Use a distinct table name to avoid collision with existing tables
+        _add_formatted_table(
+            writer.sheets[NEW_RECORDS_SHEET], df_nuevos, "RegistrosNuevosAppended"
+        )
+    return output.getvalue()
+
+
 def write_cae_excel_with_pivot(
     df_nuevos: pd.DataFrame, df_actual: pd.DataFrame
 ) -> bytes:
-    """Write new records, the current-report data and a native Excel pivot.
+    """Test utility: create a workbook with new records, data, and a native pivot.
 
-    The workbook has three sheets: REPORT_SHEET (new records), DATA_SHEET
-    (the pivot source, current report) and PIVOT_SHEET (Hoja1) which holds a
-    real Excel pivot table: rows=ETAPA SATCHMO, columns=Mes,
-    values=count of PRODUCTO and report filter=FECHA CREA.
+    This is a test utility for generating sample files with native pivots.
+    The main application flow uses append_new_records_to_report instead.
     """
+    from pivot_builder import add_native_pivot
+
     cols = resolve_cae_pivot_columns(df_actual)
 
     key_col = df_actual.columns[0]
@@ -125,6 +126,7 @@ col1, col2 = st.columns(2)
 
 df_anterior = None
 df_actual = None
+actual_bytes = None
 key_anterior_col = None
 
 with col1:
@@ -184,7 +186,10 @@ with col2:
     if file_actual is not None:
         try:
             with st.spinner("Leyendo reporte actual..."):
-                df_actual = pd.read_excel(file_actual, sheet_name=REPORT_SHEET)
+                actual_bytes = file_actual.getvalue()
+                df_actual = pd.read_excel(
+                    io.BytesIO(actual_bytes), sheet_name=REPORT_SHEET
+                )
             key_col = df_actual.columns[0]
             df_actual[key_col] = df_actual["OPERACIÓN"].astype(str) + df_actual[
                 "ETAPA SATCHMO"
@@ -193,6 +198,7 @@ with col2:
             st.dataframe(df_actual.head())
         except Exception as e:
             df_actual = None
+            actual_bytes = None
             st.error(f"Error al leer el reporte actual: {e}")
             st.info(
                 f"El archivo debe contener la hoja '{REPORT_SHEET}' y las "
@@ -226,26 +232,20 @@ if df_anterior is not None and df_actual is not None:
         if df_nuevos.empty:
             st.info("No hay registros nuevos entre ambos reportes.")
         else:
-            pivot_cae = None
-            try:
-                pivot_cae = build_cae_pivot(df_actual)
-            except KeyError as e:
-                st.warning(
-                    f"No se pudo generar la tabla dinámica ({e}); el archivo "
-                    "solo contendrá los registros nuevos. Verifica que el "
-                    "reporte actual tenga las columnas 'Mes', 'ETAPA SATCHMO', "
-                    "'PRODUCTO' y 'FECHA CREA'."
-                )
-
-            if pivot_cae is not None:
-                st.subheader("Tabla dinámica del reporte actual (Hoja1)")
-                st.caption(
-                    "Tabla dinámica de Excel · Filas: ETAPA SATCHMO · "
-                    "Columnas: Mes · Valores: recuento de PRODUCTO · "
-                    "Filtro: FECHA CREA."
-                )
-                st.dataframe(pivot_cae)
-                excel_bytes = write_cae_excel_with_pivot(df_nuevos, df_actual)
+            st.info(
+                "El archivo descargado conserva el reporte actual completo "
+                "(incluyendo su tabla dinámica en la hoja 'Hoja3') y añade "
+                "la hoja 'REGISTROS_NUEVOS' con los registros nuevos."
+            )
+            if actual_bytes is not None:
+                try:
+                    excel_bytes = append_new_records_to_report(actual_bytes, df_nuevos)
+                except Exception as e:
+                    st.warning(
+                        f"No se pudo preservar la tabla dinámica ({e}); "
+                        "el archivo solo contendrá los registros nuevos."
+                    )
+                    excel_bytes = write_cae_nuevos_excel(df_nuevos)
             else:
                 excel_bytes = write_cae_nuevos_excel(df_nuevos)
 
@@ -253,7 +253,10 @@ if df_anterior is not None and df_actual is not None:
                 label="Descargar registros nuevos",
                 data=excel_bytes,
                 file_name="registros_nuevos_cae.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
             )
     except Exception as e:
         st.error(f"Error al comparar los reportes: {e}")
