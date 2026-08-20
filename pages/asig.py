@@ -73,9 +73,12 @@ COP_STOCK_COLUMNS = [
 
 
 def _normalize_rut_series(series: pd.Series) -> pd.Series:
-    """Normalize RUT values: keep digits before dash, drop float '.0' suffix."""
+    """Normalize RUT values: drop a leading negative sign, keep the digits
+    before the verifier dash, and remove the float '.0' suffix."""
     return (
         series.astype(str)
+        .str.strip()
+        .str.replace(r"^-", "", regex=True)
         .str.split("-")
         .str[0]
         .str.strip()
@@ -130,11 +133,11 @@ def process_single_file(
     # Create a copy to avoid modifying the original
     processed_df = df.copy()
 
-    # Clean RUT column (remove dash and everything after it)
+    # Clean RUT column (drop negative sign, dash and everything after it)
     if "RUT" in processed_df.columns:
-        processed_df["RUT"] = processed_df["RUT"].astype(str).str.split("-").str[0]
+        processed_df["RUT"] = _normalize_rut_series(processed_df["RUT"])
     elif "RUT COMP" in processed_df.columns:
-        processed_df["RUT"] = processed_df["RUT COMP"].astype(str).str.split("-").str[0]
+        processed_df["RUT"] = _normalize_rut_series(processed_df["RUT COMP"])
     else:
         # If RUT column doesn't exist, create empty column
         processed_df["RUT"] = ""

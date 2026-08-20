@@ -66,6 +66,23 @@ def test_process_flujo_file_column_mapping():
     assert all(result["Tipo gestión "] == "")
 
 
+def test_process_flujo_file_negative_rut():
+    """Negative RUT values keep their digits instead of becoming empty."""
+    df_flujo = pd.DataFrame(
+        {
+            "CONTRATO": ["F001", "F002", "F003"],
+            "RUT": [-20123456, -19513991.0, "-18765432-5"],
+            "NOMBRE": ["A", "B", "C"],
+            "MONTO CASTIGO": [1, 2, 3],
+        }
+    )
+
+    result = process_flujo_file(df_flujo, "flujo.xlsx")
+
+    assert result["RUT"].tolist() == ["20123456", "19513991", "18765432"]
+    assert all(result["RUT"] != "")
+
+
 def test_process_flujo_file_origen_keeps_dots_in_filename():
     """ORIGEN keeps the full filename, stripping only the extension."""
     df_flujo = create_sample_flujo()
@@ -75,6 +92,25 @@ def test_process_flujo_file_origen_keeps_dots_in_filename():
 
     expected = "ASIGNACION JUDUCIAL H. MATTHEI BANTOTAL 19-08-2026"
     assert all(result["ORIGEN"] == expected)
+
+
+def test_process_single_file_negative_rut():
+    """Negative RUT values in the stock path keep their digits."""
+    df_castigo = pd.DataFrame(
+        {
+            "CONTRATO": ["C001", "C002"],
+            "RUT": [-19513991, "-20123456-8"],
+            "NOMBRE CLIENTE": ["Juan Pérez", "María González"],
+            "MONTO CASTIGO": [1500000, 800000],
+            "FECHA CASTIGO": ["2026-01-15", "2026-02-20"],
+            "CARTERA": ["Comercial", "Consumo"],
+        }
+    )
+
+    result = process_single_file(df_castigo, "castigo.xlsx", "Castigo")
+
+    assert result["RUT"].tolist() == ["19513991", "20123456"]
+    assert all(result["RUT"] != "")
 
 
 def test_process_single_file_origen_keeps_dots_in_filename():
