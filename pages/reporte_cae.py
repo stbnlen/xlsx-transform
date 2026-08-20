@@ -5,8 +5,11 @@ import streamlit as st
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
+from pivot_builder import add_native_pivot
+
 REPORT_SHEET = "REPORTES_GESTIONES_TODAS_ETAPAS"
 PIVOT_SHEET = "Hoja1"
+DATA_SHEET = "DATOS"
 
 
 def _find_cae_column(df: pd.DataFrame, name: str):
@@ -18,30 +21,34 @@ def _find_cae_column(df: pd.DataFrame, name: str):
     return None
 
 
-def build_cae_pivot(df: pd.DataFrame) -> pd.DataFrame:
-    """Build a pivot: rows=ETAPA SATCHMO, columns=Mes, values=count of PRODUCTO.
+def resolve_cae_pivot_columns(df: pd.DataFrame) -> dict:
+    """Resolve the columns required for the CAE pivot table.
 
     Raises KeyError listing any required column that is missing.
     """
-    mes_col = _find_cae_column(df, "Mes")
-    etapa_col = _find_cae_column(df, "ETAPA SATCHMO")
-    producto_col = _find_cae_column(df, "PRODUCTO")
-    missing = [
-        label
-        for label, col in (
-            ("Mes", mes_col),
-            ("ETAPA SATCHMO", etapa_col),
-            ("PRODUCTO", producto_col),
-        )
-        if col is None
-    ]
+    resolved = {
+        "Mes": _find_cae_column(df, "Mes"),
+        "ETAPA SATCHMO": _find_cae_column(df, "ETAPA SATCHMO"),
+        "PRODUCTO": _find_cae_column(df, "PRODUCTO"),
+        "FECHA CREA": _find_cae_column(df, "FECHA CREA"),
+    }
+    missing = [name for name, col in resolved.items() if col is None]
     if missing:
         raise KeyError("Columnas faltantes: " + ", ".join(missing))
+    return resolved
+
+
+def build_cae_pivot(df: pd.DataFrame) -> pd.DataFrame:
+    """Build a preview pivot: rows=ETAPA SATCHMO, columns=Mes, values=count.
+
+    Raises KeyError listing any required column that is missing.
+    """
+    cols = resolve_cae_pivot_columns(df)
     return pd.pivot_table(
         df,
-        index=etapa_col,
-        columns=mes_col,
-        values=producto_col,
+        index=cols["ETAPA SATCHMO"],
+        columns=cols["Mes"],
+        values=cols["PRODUCTO"],
         aggfunc="count",
         fill_value=0,
     )
@@ -77,16 +84,39 @@ def write_cae_nuevos_excel(df_nuevos: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 
-def write_cae_combined_excel(df_nuevos: pd.DataFrame, pivot: pd.DataFrame) -> bytes:
-    """Write new records plus the pivot table (Hoja1) to one xlsx."""
+def write_cae_excel_with_pivot(
+    df_nuevos: pd.DataFrame, df_actual: pd.DataFrame
+) -> bytes:
+    """Write new records, the current-report data and a native Excel pivot.
+
+    The workbook has three sheets: REPORT_SHEET (new records), DATA_SHEET
+    (the pivot source, current report) and PIVOT_SHEET (Hoja1) which holds a
+    real Excel pivot table: rows=ETAPA SATCHMO, columns=Mes,
+    values=count of PRODUCTO and report filter=FECHA CREA.
+    """
+    cols = resolve_cae_pivot_columns(df_actual)
+
+    key_col = df_actual.columns[0]
+    drop_cols = [key_col] if key_col not in cols.values() else []
+    df_data = df_actual.drop(columns=drop_cols)
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df_nuevos.to_excel(writer, sheet_name=REPORT_SHEET, index=False)
         _add_formatted_table(writer.sheets[REPORT_SHEET], df_nuevos, "RegistrosNuevos")
-        pivot_flat = pivot.reset_index()
-        pivot_flat.to_excel(writer, sheet_name=PIVOT_SHEET, index=False)
-        _add_formatted_table(writer.sheets[PIVOT_SHEET], pivot_flat, "TablaDinamica")
-    return output.getvalue()
+        df_data.to_excel(writer, sheet_name=DATA_SHEET, index=False)
+        writer.book.create_sheet(PIVOT_SHEET)
+
+    return add_native_pivot(
+        output.getvalue(),
+        df_data=df_data,
+        source_sheet=DATA_SHEET,
+        pivot_sheet=PIVOT_SHEET,
+        row_field=cols["ETAPA SATCHMO"],
+        col_field=cols["Mes"],
+        value_field=cols["PRODUCTO"],
+        filter_field=cols["FECHA CREA"],
+    )
 
 
 st.title("Reporte CAE")
@@ -203,18 +233,19 @@ if df_anterior is not None and df_actual is not None:
                 st.warning(
                     f"No se pudo generar la tabla dinámica ({e}); el archivo "
                     "solo contendrá los registros nuevos. Verifica que el "
-                    "reporte actual tenga las columnas 'Mes', 'ETAPA SATCHMO' "
-                    "y 'PRODUCTO'."
+                    "reporte actual tenga las columnas 'Mes', 'ETAPA SATCHMO', "
+                    "'PRODUCTO' y 'FECHA CREA'."
                 )
 
             if pivot_cae is not None:
                 st.subheader("Tabla dinámica del reporte actual (Hoja1)")
                 st.caption(
-                    "Filas: ETAPA SATCHMO · Columnas: Mes · "
-                    "Valores: recuento de PRODUCTO."
+                    "Tabla dinámica de Excel · Filas: ETAPA SATCHMO · "
+                    "Columnas: Mes · Valores: recuento de PRODUCTO · "
+                    "Filtro: FECHA CREA."
                 )
                 st.dataframe(pivot_cae)
-                excel_bytes = write_cae_combined_excel(df_nuevos, pivot_cae)
+                excel_bytes = write_cae_excel_with_pivot(df_nuevos, df_actual)
             else:
                 excel_bytes = write_cae_nuevos_excel(df_nuevos)
 
