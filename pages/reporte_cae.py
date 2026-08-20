@@ -69,8 +69,8 @@ def write_cae_nuevos_excel(df_nuevos: pd.DataFrame) -> bytes:
 
 
 def append_new_records_to_report(report_bytes: bytes, df_nuevos: pd.DataFrame) -> bytes:
-    """Append new records to the main data sheet (REPORTES_GESTIONES_TODAS_ETAPAS)
-    so the existing pivot table (Hoja3) reflects them when refreshed.
+    """Replace main data sheet with only new records (no Llave column),
+    preserving the native pivot table (Hoja3).
     """
     wb = openpyxl.load_workbook(io.BytesIO(report_bytes))
     ws = wb[REPORT_SHEET]
@@ -80,11 +80,31 @@ def append_new_records_to_report(report_bytes: bytes, df_nuevos: pd.DataFrame) -
     if ws._tables:
         table = next(iter(ws._tables.values()))
 
-    # Find the last row with data
-    start_row = ws.max_row + 1
+    # Find Llave column index (1-based)
+    llave_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "Llave":
+            llave_idx = idx
+            break
 
-    # Write new records
-    for row_idx, row in enumerate(df_nuevos.itertuples(index=False), start=start_row):
+    # Remove Llave column if present
+    if llave_idx is not None:
+        ws.delete_cols(llave_idx)
+
+    # Find the table in the main sheet (after potential column deletion)
+    table = None
+    if ws._tables:
+        table = next(iter(ws._tables.values()))
+
+    # Clear all data rows (keep header)
+    ws.delete_rows(2, ws.max_row)
+
+    # Remove Llave from df_nuevos if present
+    if "Llave" in df_nuevos.columns:
+        df_nuevos = df_nuevos.drop(columns=["Llave"])
+
+    # Write new records starting from row 2
+    for row_idx, row in enumerate(df_nuevos.itertuples(index=False), start=2):
         for col_idx, value in enumerate(row, start=1):
             ws.cell(row=row_idx, column=col_idx, value=value)
 

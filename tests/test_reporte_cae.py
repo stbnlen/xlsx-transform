@@ -74,19 +74,16 @@ def test_append_new_records_to_main_sheet():
         assert "Hoja1" in wb.sheetnames
         assert "REGISTROS_NUEVOS" not in wb.sheetnames
 
-        # Main sheet has original (2) + new (2) = 4 records
+        # Main sheet has ONLY the 2 new records (old ones removed, Llave removed)
         main_sheet = pd.read_excel(
             io.BytesIO(data), sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS"
         )
-        assert len(main_sheet) == 4
+        assert len(main_sheet) == 2
+        assert "Llave" not in main_sheet.columns
         assert "OPERACION" in main_sheet.columns
         assert "ETAPA SATCHMO" in main_sheet.columns
         assert "Mes" in main_sheet.columns
         assert "PRODUCTO" in main_sheet.columns
-
-        # Verify new records were appended
-        new_records = main_sheet.tail(2)
-        assert new_records["OPERACION"].astype(str).tolist() == ["1", "2"]
 
 
 def test_write_cae_nuevos_excel_single_sheet():
@@ -142,4 +139,5 @@ def test_append_new_records_without_pivot_fallback():
         main_sheet = pd.read_excel(
             io.BytesIO(data), sheet_name="REPORTES_GESTIONES_TODAS_ETAPAS"
         )
-        assert len(main_sheet) == 6  # 4 original + 2 new
+        assert len(main_sheet) == 2
+        assert "Llave" not in main_sheet.columns
