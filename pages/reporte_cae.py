@@ -243,16 +243,41 @@ if df_anterior is not None and df_actual is not None:
         st.write(f"Total registros nuevos: {len(df_nuevos)}")
         st.dataframe(df_nuevos.head())
 
+        st.subheader("Registros nuevos en reporte actual")
+        st.write(f"Total registros nuevos: {len(df_nuevos)}")
+        st.dataframe(df_nuevos.head())
+
         if df_nuevos.empty:
             st.info("No hay registros nuevos entre ambos reportes.")
         else:
             st.info(
                 "El archivo descargado conserva el reporte actual completo "
                 "(incluyendo su tabla dinámica en la hoja 'Hoja3') y añade "
-                "la hoja 'REGISTROS_NUEVOS' con los registros nuevos."
+                "los nuevos registros a la hoja principal para que la tabla "
+                "dinámica los refleje al actualizar."
             )
             if actual_bytes is not None:
                 try:
+                    # Regenerate Llave for new records to match main sheet structure
+                    key_col = df_actual.columns[0]
+                    df_nuevos[key_col] = df_nuevos["OPERACIÓN"].astype(str) + df_nuevos[
+                        "ETAPA SATCHMO"
+                    ].astype(str)
+
+                    # Get the column order from the main sheet in the uploaded workbook
+                    # We need to read the main sheet structure from actual_bytes
+                    import openpyxl
+
+                    wb_temp = openpyxl.load_workbook(io.BytesIO(actual_bytes))
+                    ws_main = wb_temp[REPORT_SHEET]
+                    main_cols = [
+                        cell.value
+                        for cell in next(ws_main.iter_rows(min_row=1, max_row=1))
+                    ]
+
+                    # Ensure df_nuevos has the same columns in the same order
+                    df_nuevos = df_nuevos.reindex(columns=main_cols)
+
                     excel_bytes = append_new_records_to_report(actual_bytes, df_nuevos)
                 except Exception as e:
                     st.warning(
