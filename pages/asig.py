@@ -1,4 +1,5 @@
 import io
+import os
 from datetime import datetime
 
 import pandas as pd
@@ -130,7 +131,7 @@ def process_single_file(
         processed_df["RUT"] = ""
 
     # Add ORIGEN column from filename (without extension)
-    origen_name = filename.split(".")[0]  # Remove file extension
+    origen_name = os.path.splitext(filename)[0]  # Remove only the extension
     processed_df["ORIGEN"] = origen_name
 
     # Handle column mapping based on file type
@@ -276,7 +277,7 @@ def process_flujo_file(df_flujo: pd.DataFrame, filename: str) -> pd.DataFrame:
     """Process a flujo file into the standard FORUM column layout."""
     processed_df = pd.DataFrame(index=df_flujo.index)
 
-    origen_name = filename.split(".")[0]
+    origen_name = os.path.splitext(filename)[0]
     processed_df["ORIGEN"] = origen_name
 
     contrato_col = _find_column_insensitive(df_flujo, ["CONTRATO", "CONTRATO RS"])

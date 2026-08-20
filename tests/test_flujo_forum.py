@@ -11,6 +11,7 @@ from pages.asig import (  # noqa: E402
     FORUM_COLUMN_ORDER,
     process_flujo_file,
     process_flujo_forum_data,
+    process_single_file,
 )
 
 
@@ -63,6 +64,37 @@ def test_process_flujo_file_column_mapping():
     assert all(result["ETAPA DEMANDA"] == "")
     assert all(result["CIUDAD"] == "")
     assert all(result["Tipo gestión "] == "")
+
+
+def test_process_flujo_file_origen_keeps_dots_in_filename():
+    """ORIGEN keeps the full filename, stripping only the extension."""
+    df_flujo = create_sample_flujo()
+    filename = "ASIGNACION JUDUCIAL H. MATTHEI BANTOTAL 19-08-2026.xlsx"
+
+    result = process_flujo_file(df_flujo, filename)
+
+    expected = "ASIGNACION JUDUCIAL H. MATTHEI BANTOTAL 19-08-2026"
+    assert all(result["ORIGEN"] == expected)
+
+
+def test_process_single_file_origen_keeps_dots_in_filename():
+    """ORIGEN in the stock path also keeps dots, stripping only the extension."""
+    df_castigo = pd.DataFrame(
+        {
+            "CONTRATO": ["C001"],
+            "RUT": ["19513991-1"],
+            "NOMBRE CLIENTE": ["Juan Pérez"],
+            "MONTO CASTIGO": [1500000],
+            "FECHA CASTIGO": ["2026-01-15"],
+            "CARTERA": ["Comercial"],
+        }
+    )
+    filename = "ASIGNACION JUDUCIAL H. MATTHEI BANTOTAL 19-08-2026.xlsx"
+
+    result = process_single_file(df_castigo, filename, "Castigo")
+
+    expected = "ASIGNACION JUDUCIAL H. MATTHEI BANTOTAL 19-08-2026"
+    assert all(result["ORIGEN"] == expected)
 
 
 def test_process_flujo_file_case_insensitive():
