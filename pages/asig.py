@@ -398,6 +398,9 @@ def process_flujo_cop_file(df_flujo: pd.DataFrame) -> pd.DataFrame:
     """
     rut_col = _find_column_insensitive(df_flujo, ["RUT DEUDOR", "RUT", "RUT COM"])
     dv_col = _find_column_insensitive(df_flujo, ["DV"])
+    asignacion_col = _find_column_insensitive(
+        df_flujo, ["FECHA RECEPCIÓN FACTURA", "FECHA RECEPCION FACTURA"]
+    )
     nombre_col = _find_column_insensitive(df_flujo, ["NOMBRE DEUDOR", "NOMBRE"])
     saldo_col = _find_column_insensitive(df_flujo, ["SALDO DEUDOR"])
     estado_col = _find_column_insensitive(df_flujo, ["ESTADO CRM"])
@@ -405,6 +408,13 @@ def process_flujo_cop_file(df_flujo: pd.DataFrame) -> pd.DataFrame:
     working_df = pd.DataFrame(index=df_flujo.index)
     working_df["RUT"] = _normalize_rut_series(df_flujo[rut_col]) if rut_col else ""
     working_df["DV"] = _clean_str_series(df_flujo[dv_col]) if dv_col else ""
+    working_df["AISGNACION"] = (
+        df_flujo[asignacion_col]
+        .astype(object)
+        .where(df_flujo[asignacion_col].notna(), "")
+        if asignacion_col
+        else ""
+    )
     working_df["NOMBRE"] = (
         df_flujo[nombre_col].astype(str).str.strip().replace("nan", "")
         if nombre_col
@@ -423,6 +433,7 @@ def process_flujo_cop_file(df_flujo: pd.DataFrame) -> pd.DataFrame:
 
     grouped = working_df.groupby("RUT", as_index=False, sort=False).agg(
         DV=("DV", "first"),
+        AISGNACION=("AISGNACION", "first"),
         NOMBRE=("NOMBRE", "first"),
         SALDO=("SALDO", "sum"),
         ESTADO=("ESTADO", "first"),
@@ -431,7 +442,7 @@ def process_flujo_cop_file(df_flujo: pd.DataFrame) -> pd.DataFrame:
     processed_df = pd.DataFrame()
     processed_df["RUT COM"] = grouped["RUT"]
     processed_df["DV"] = grouped["DV"]
-    processed_df["AISGNACION"] = ""
+    processed_df["AISGNACION"] = grouped["AISGNACION"]
     processed_df["Demandado"] = grouped["NOMBRE"]
     processed_df["SALDO DEUDOR"] = grouped["SALDO"]
     processed_df["RUT COMPLETO"] = grouped["RUT"] + "-" + grouped["DV"]
@@ -769,7 +780,8 @@ with tab5:
             st.error(f"Error al procesar los archivos: {e}")
             st.info(
                 "Asegúrate de que el archivo de flujo tenga las columnas requeridas: "
-                "RUT DEUDOR, DV, NOMBRE DEUDOR, SALDO DEUDOR, ESTADO CRM"
+                "RUT DEUDOR, DV, FECHA RECEPCIÓN FACTURA, NOMBRE DEUDOR, "
+                "SALDO DEUDOR, ESTADO CRM"
             )
     elif cop_stock_file is not None:
         st.info("Carga el archivo Flujo para continuar.")

@@ -126,6 +126,11 @@ def create_sample_cop_flujo() -> pd.DataFrame:
         {
             "RUT DEUDOR": ["11111111", "22222222", "11111111"],
             "DV": ["1", "2", "1"],
+            "FECHA RECEPCIÓN FACTURA": [
+                "2026-08-01",
+                "2026-08-02",
+                "2026-08-01",
+            ],
             "NOMBRE DEUDOR": ["Pedro Silva", "Maria Ruiz", "Pedro Silva"],
             "SALDO DEUDOR": [100, 200, 50],
             "ESTADO CRM": ["Contactado", "Sin contacto", "Contactado"],
@@ -158,6 +163,7 @@ def test_process_flujo_cop_file_groups_repeated_ruts():
     row = result[result["RUT COM"] == "11111111"].iloc[0]
     assert row["SALDO DEUDOR"] == 150
     assert row["DV"] == "1"
+    assert row["AISGNACION"] == "2026-08-01"
     assert row["Demandado"] == "Pedro Silva"
     assert row["ESTADO CRM"] == "Contactado"
 
@@ -170,8 +176,17 @@ def test_process_flujo_cop_file_column_layout():
     row = result[result["RUT COM"] == "11111111"].iloc[0]
     assert row["RUT COMPLETO"] == "11111111-1"
     assert row["Flujo/Stock"] == "FLUJO"
-    assert row["AISGNACION"] == ""
+    assert row["AISGNACION"] == "2026-08-01"
     assert row["FF"] == ""
+
+
+def test_process_flujo_cop_file_missing_fecha_recepcion():
+    """Flujo files without FECHA RECEPCIÓN FACTURA get empty AISGNACION."""
+    df_flujo = create_sample_cop_flujo().drop(columns=["FECHA RECEPCIÓN FACTURA"])
+
+    result = process_flujo_cop_file(df_flujo)
+
+    assert (result["AISGNACION"] == "").all()
 
 
 def test_process_flujo_cop_data_appends_new_ruts():
@@ -198,6 +213,7 @@ def test_process_flujo_cop_data_discards_ruts_in_stock():
         {
             "RUT DEUDOR": ["19513991", "33333333", "19513991"],
             "DV": ["1", "3", "1"],
+            "FECHA RECEPCIÓN FACTURA": ["2026-08-01", "2026-08-02", "2026-08-01"],
             "NOMBRE DEUDOR": ["Juan Pérez", "José Soto", "Juan Pérez"],
             "SALDO DEUDOR": [100, 200, 100],
             "ESTADO CRM": ["Activo", "", "Activo"],
