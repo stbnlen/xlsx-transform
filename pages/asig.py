@@ -385,6 +385,102 @@ def read_cop_stock_file(file: io.BytesIO) -> pd.DataFrame:
         ) from e
 
 
+def _clean_str_series(series: pd.Series) -> pd.Series:
+    """Convert a series to clean strings: trimmed, uppercased, NaN as ''."""
+    return series.astype(str).str.strip().str.upper().replace("NAN", "")
+
+
+def process_flujo_cop_file(df_flujo: pd.DataFrame) -> pd.DataFrame:
+    """Process a COP flujo file into the stock layout, grouping repeated RUTs.
+
+    Repeated RUTs are collapsed into a single row whose SALDO DEUDOR is the
+    total sum for that RUT; the remaining fields keep the first occurrence.
+    """
+    rut_col = _find_column_insensitive(df_flujo, ["RUT DEUDOR", "RUT", "RUT COM"])
+    dv_col = _find_column_insensitive(df_flujo, ["DV"])
+    nombre_col = _find_column_insensitive(df_flujo, ["NOMBRE DEUDOR", "NOMBRE"])
+    saldo_col = _find_column_insensitive(df_flujo, ["SALDO DEUDOR"])
+    estado_col = _find_column_insensitive(df_flujo, ["ESTADO CRM"])
+
+    working_df = pd.DataFrame(index=df_flujo.index)
+    working_df["RUT"] = _normalize_rut_series(df_flujo[rut_col]) if rut_col else ""
+    working_df["DV"] = _clean_str_series(df_flujo[dv_col]) if dv_col else ""
+    working_df["NOMBRE"] = (
+        df_flujo[nombre_col].astype(str).str.strip().replace("nan", "")
+        if nombre_col
+        else ""
+    )
+    working_df["SALDO"] = (
+        pd.to_numeric(df_flujo[saldo_col], errors="coerce").fillna(0)
+        if saldo_col
+        else 0
+    )
+    working_df["ESTADO"] = (
+        df_flujo[estado_col].astype(str).str.strip().replace("nan", "")
+        if estado_col
+        else ""
+    )
+
+    grouped = working_df.groupby("RUT", as_index=False, sort=False).agg(
+        DV=("DV", "first"),
+        NOMBRE=("NOMBRE", "first"),
+        SALDO=("SALDO", "sum"),
+        ESTADO=("ESTADO", "first"),
+    )
+
+    processed_df = pd.DataFrame()
+    processed_df["RUT COM"] = grouped["RUT"]
+    processed_df["DV"] = grouped["DV"]
+    processed_df["AISGNACION"] = ""
+    processed_df["Demandado"] = grouped["NOMBRE"]
+    processed_df["SALDO DEUDOR"] = grouped["SALDO"]
+    processed_df["RUT COMPLETO"] = grouped["RUT"] + "-" + grouped["DV"]
+    processed_df["ESTADO CRM"] = grouped["ESTADO"]
+    processed_df["Flujo/Stock"] = "FLUJO"
+    processed_df["FF"] = ""
+    return processed_df
+
+
+def process_flujo_cop_data(
+    df_stock: pd.DataFrame, df_flujo: pd.DataFrame
+) -> tuple[pd.DataFrame, int, int]:
+    """Append grouped flujo records to the COP stock.
+
+    Flujo rows are grouped by RUT (SALDO DEUDOR summed) and RUTs already
+    present in the stock are discarded. Returns the combined dataframe, the
+    count of accepted RUT groups, and the count of discarded RUT groups.
+    """
+    df_flujo_processed = process_flujo_cop_file(df_flujo)
+
+    _, stock_mapping = validate_required_columns(df_stock.columns, COP_STOCK_COLUMNS)
+    df_stock_normalized = df_stock.rename(
+        columns={actual: expected for expected, actual in stock_mapping.items()}
+    )
+
+    stock_ruts: set[str] = set()
+    stock_rut_col = _find_column_insensitive(
+        df_stock_normalized, ["RUT COM", "RUT COMPLETO"]
+    )
+    if stock_rut_col:
+        stock_ruts = set(_normalize_rut_series(df_stock_normalized[stock_rut_col]))
+        stock_ruts.discard("")
+        stock_ruts.discard("nan")
+
+    mask_new = ~df_flujo_processed["RUT COM"].isin(stock_ruts)
+    discarded_count = int((~mask_new).sum())
+    accepted_count = int(mask_new.sum())
+
+    combined_df = pd.concat(
+        [df_stock_normalized.copy(), df_flujo_processed[mask_new]], ignore_index=True
+    )
+
+    for col in COP_STOCK_COLUMNS:
+        if col not in combined_df.columns:
+            combined_df[col] = ""
+
+    return combined_df[COP_STOCK_COLUMNS], accepted_count, discarded_count
+
+
 st.title("Asignaciones")
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
@@ -591,7 +687,8 @@ with tab5:
     st.write(
         "Une los registros de un archivo de flujo al stock de COP. "
         "El stock se lee desde la hoja 'Hoja2' del archivo. "
-        "Carga ambos archivos para ver sus vistas previas."
+        "Los RUTs repetidos del flujo se agrupan en un solo registro sumando "
+        "su SALDO DEUDOR, y los RUTs que ya están en el stock se descartan."
     )
 
     cop_stock_file = st.file_uploader(
@@ -608,9 +705,10 @@ with tab5:
     if cop_stock_file is not None and cop_flujo_file is not None:
         st.success("Ambos archivos se cargaron correctamente.")
 
-    if cop_stock_file is not None:
         try:
             df_cop_stock = read_cop_stock_file(cop_stock_file)
+            df_cop_flujo = pd.read_excel(cop_flujo_file)
+
             st.write("Vista previa del archivo Stock (hoja 'Hoja2'):")
             st.dataframe(df_cop_stock.head().astype(str))
 
@@ -624,18 +722,72 @@ with tab5:
                 )
             else:
                 st.success("El archivo Stock tiene todas las columnas esperadas.")
-        except Exception as e:
-            st.error(f"Error al leer el archivo Stock: {e}")
 
-    if cop_flujo_file is not None:
-        try:
-            df_cop_flujo = pd.read_excel(cop_flujo_file)
             st.write("Vista previa del archivo Flujo:")
             st.dataframe(df_cop_flujo.head().astype(str))
+
+            combined_df, accepted_count, discarded_count = process_flujo_cop_data(
+                df_cop_stock, df_cop_flujo
+            )
+
+            col_a, col_b, col_c, col_d = st.columns(4)
+            col_a.metric("Registros en el flujo", len(df_cop_flujo))
+            col_b.metric("RUTs únicos agrupados", accepted_count + discarded_count)
+            col_c.metric("Aceptados (RUT nuevo)", accepted_count)
+            col_d.metric("Descartados (RUT en stock)", discarded_count)
+
+            st.write(
+                f"Stock final: {len(combined_df)} registros "
+                f"(stock original: {len(df_cop_stock)})."
+            )
+
+            display_combined = combined_df.copy()
+            for col in display_combined.columns:
+                if display_combined[col].dtype == "object":
+                    display_combined[col] = display_combined[col].astype(str)
+            st.dataframe(display_combined)
+
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                combined_df.to_excel(writer, sheet_name=COP_STOCK_SHEET, index=False)
+            excel_data = output.getvalue()
+
+            ahora = datetime.now()
+            dia_actual = ahora.day
+            mes_actual = MESES_ESPANOL[ahora.month]
+            anio_actual = ahora.year
+            nombre_archivo = f"COP_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+
+            st.download_button(
+                label="Descargar stock actualizado como XLSX",
+                data=excel_data,
+                file_name=nombre_archivo,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+        except Exception as e:
+            st.error(f"Error al procesar los archivos: {e}")
+            st.info(
+                "Asegúrate de que el archivo de flujo tenga las columnas requeridas: "
+                "RUT DEUDOR, DV, NOMBRE DEUDOR, SALDO DEUDOR, ESTADO CRM"
+            )
+    elif cop_stock_file is not None:
+        st.info("Carga el archivo Flujo para continuar.")
+        try:
+            df_cop_stock_preview = read_cop_stock_file(cop_stock_file)
+            st.write("Vista previa del archivo Stock (hoja 'Hoja2'):")
+            st.dataframe(df_cop_stock_preview.head().astype(str))
+        except Exception as e:
+            st.error(f"Error al leer el archivo Stock: {e}")
+    elif cop_flujo_file is not None:
+        st.info("Carga el archivo Stock para continuar.")
+        try:
+            df_cop_flujo_preview = pd.read_excel(cop_flujo_file)
+            st.write("Vista previa del archivo Flujo:")
+            st.dataframe(df_cop_flujo_preview.head().astype(str))
         except Exception as e:
             st.error(f"Error al leer el archivo Flujo: {e}")
-
-    if cop_stock_file is None and cop_flujo_file is None:
+    else:
         st.info("Carga ambos archivos, Stock y Flujo, para continuar.")
 
 with tab6:
