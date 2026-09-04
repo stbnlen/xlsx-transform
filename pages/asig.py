@@ -767,7 +767,7 @@ with tab5:
             dia_actual = ahora.day
             mes_actual = MESES_ESPANOL[ahora.month]
             anio_actual = ahora.year
-            nombre_archivo = f"FRM_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+            nombre_archivo = f"COP_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
 
             st.download_button(
                 label="Descargar stock actualizado como XLSX",
