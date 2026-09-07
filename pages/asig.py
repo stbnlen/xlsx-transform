@@ -186,14 +186,10 @@ def process_single_file(
 
         # For CARTERA, handle case sensitivity
         if "CARTERA" not in processed_df.columns:
-            if "cartera" in df.columns:
-                processed_df["CARTERA"] = df["cartera"]
-            elif "CARTERA" in df.columns:
-                processed_df["CARTERA"] = df["CARTERA"]
-            elif "Marca Cartera" in df.columns:
-                processed_df["CARTERA"] = df["Marca Cartera"]
-            else:
-                processed_df["CARTERA"] = ""
+            source_col = _find_column_insensitive(
+                df, ["CARTERA", "cartera", "Marca Cartera"]
+            )
+            processed_df["CARTERA"] = df[source_col] if source_col else ""
         # For Tipo gestión, map from Tipo de gestión column
         if "Tipo gestión " not in processed_df.columns:
             if "Tipo de gestión" in df.columns:
@@ -255,16 +251,10 @@ def process_single_file(
 
         # For CARTERA, handle case sensitivity - if not found, use "Dual vigente" for vigente files
         if "CARTERA" not in processed_df.columns:
-            if "cartera" in df.columns:
-                processed_df["CARTERA"] = df["cartera"]
-            elif "CARTERA" in df.columns:
-                processed_df["CARTERA"] = df["CARTERA"]
-            elif "Marca Cartera" in df.columns:
-                processed_df["CARTERA"] = df["Marca Cartera"]
-            else:
-                processed_df["CARTERA"] = (
-                    "Dual vigente"  # Default for vigente files when column not found
-                )
+            source_col = _find_column_insensitive(
+                df, ["CARTERA", "cartera", "Marca Cartera"]
+            )
+            processed_df["CARTERA"] = df[source_col] if source_col else "Dual vigente"
 
         # Add empty columns for the fields that should be empty initially
         processed_df["ETAPA DEMANDA"] = ""
