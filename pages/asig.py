@@ -387,7 +387,7 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
         column_mapping = {
             "Rut Deudor": "Rut Deudor",
             "DV2": "DV2",
-            "Mandante Cuenta": "Mandante Cuenta",
+            "Mandante Cuenta": "Cuenta",
             "Número de Facturas": "Número de Facturas",
             "Suma de Monto Deuda Factura": "Suma de Monto Deuda Factura",
         }
@@ -944,7 +944,7 @@ with tab7:
             st.error(f"Error al procesar el archivo: {e}")
             st.info(
                 "Asegúrate de que el archivo tenga las columnas:"
-                " RUT DEUDOR, DV, N°/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
+                "RUT DEUDOR, DV, N°/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
             )
     else:
         st.info("Carga un archivo Flujo MKC para continuar.")
