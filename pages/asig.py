@@ -375,8 +375,11 @@ def read_cop_stock_file(file: io.BytesIO) -> pd.DataFrame:
         ) from e
 
 
-def read_flujo_mkc_file(file: io.BytesIO) -> pd.DataFrame:
-    """Read Flujo MKC data from the 'Hoja2' sheet of the Excel file."""
+FLUJO_A_CARGAR_SHEET = "FLUJO A CARGAR"
+
+
+def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
+    """Read Flujo MKC stock data from the 'Hoja2' sheet of the Excel file."""
     try:
         df = pd.read_excel(file, sheet_name="Hoja2")
         # Ensure column names are properly handled - keep original names
@@ -393,7 +396,20 @@ def read_flujo_mkc_file(file: io.BytesIO) -> pd.DataFrame:
         df = df.rename(columns=actual_columns)
         return df
     except ValueError as e:
-        raise ValueError("Error leyendo el archivo Flujo MKC") from e
+        raise ValueError("Error leyendo el archivo Flujo MKC stock") from e
+
+
+def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
+    """Read Flujo MKC flujo data from the 'FLUJO A CARGAR' sheet of the Excel file."""
+    try:
+        df = pd.read_excel(file, sheet_name=FLUJO_A_CARGAR_SHEET)
+        # Ensure column names are properly handled
+        # The flujo columns are already in the correct format: RUT DEUDOR, DV, N°/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR
+        return df
+    except ValueError as e:
+        raise ValueError(
+            f"El archivo Flujo MKC no contiene la hoja '{FLUJO_A_CARGAR_SHEET}'"
+        ) from e
 
 
 def _clean_str_series(series: pd.Series) -> pd.Series:
@@ -833,7 +849,7 @@ with tab7:
         st.success("Archivo cargado correctamente.")
 
         try:
-            df_mkc = read_flujo_mkc_file(mkc_stock_file)
+            df_mkc = read_flujo_mkc_stock_file(mkc_stock_file)
 
             st.write("Vista previa del archivo Stock (Hoja2):")
             st.dataframe(df_mkc.head().astype(str))
@@ -892,7 +908,7 @@ with tab7:
         st.success("Flujo archivo cargado correctamente.")
 
         try:
-            df_flujo = pd.read_excel(mkc_flujo_file)
+            df_flujo = read_flujo_mkc_flujo_file(mkc_flujo_file)
 
             st.write("Vista previa del archivo Flujo:")
             st.dataframe(df_flujo.head().astype(str))
