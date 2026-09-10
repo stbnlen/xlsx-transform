@@ -375,6 +375,27 @@ def read_cop_stock_file(file: io.BytesIO) -> pd.DataFrame:
         ) from e
 
 
+def read_flujo_mkc_file(file: io.BytesIO) -> pd.DataFrame:
+    """Read Flujo MKC data from the 'Hoja2' sheet of the Excel file."""
+    try:
+        df = pd.read_excel(file, sheet_name="Hoja2")
+        # Ensure column names are properly handled - keep original names
+        # Rename columns to match expected format
+        column_mapping = {
+            "Rut Deudor": "Rut Deudor",
+            "DV2": "DV2",
+            "Mandante Cuenta": "Mandante Cuenta",
+            "Número de Facturas": "Número de Facturas",
+            "Suma de Monto Deuda Factura": "Suma de Monto Deuda Factura",
+        }
+        # Only rename columns that exist
+        actual_columns = {col: column_mapping.get(col, col) for col in df.columns}
+        df = df.rename(columns=actual_columns)
+        return df
+    except ValueError as e:
+        raise ValueError("Error leyendo el archivo Flujo MKC") from e
+
+
 def _clean_str_series(series: pd.Series) -> pd.Series:
     """Convert a series to clean strings: trimmed, uppercased, NaN as ''."""
     return series.astype(str).str.strip().str.upper().replace("NAN", "")
@@ -484,8 +505,8 @@ def process_flujo_cop_data(
 
 st.title("Asignaciones")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "Flujo COP", "BCI"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    ["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "Flujo COP", "BCI", "Flujo MKC"]
 )
 
 with tab1:
@@ -794,3 +815,120 @@ with tab5:
 
 with tab6:
     show_bci_view()
+
+with tab7:
+    st.header("Flujo MKC")
+    st.write(
+        "Sube un archivo Excel de stock con los datos de Flujo MKC. "
+        "El archivo debe contener la hoja 'Hoja2' con las columnas especificadas."
+    )
+
+    mkc_stock_file = st.file_uploader(
+        "Selecciona el archivo Stock Flujo MKC",
+        type=["xlsx", "xls"],
+        key="flujo_mkc_stock",
+    )
+
+    if mkc_stock_file is not None:
+        st.success("Archivo cargado correctamente.")
+
+        try:
+            df_mkc = read_flujo_mkc_file(mkc_stock_file)
+
+            st.write("Vista previa del archivo Stock (Hoja2):")
+            st.dataframe(df_mkc.head().astype(str))
+
+            # Check if required columns exist
+            required_columns = [
+                "Rut Deudor",
+                "DV2",
+                "Mandante Cuenta",
+                "Número de Facturas",
+                "Suma de Monto Deuda Factura",
+            ]
+            missing_columns = [
+                col for col in required_columns if col not in df_mkc.columns
+            ]
+
+            if missing_columns:
+                st.warning(
+                    "Columnas esperadas no encontradas en el stock: "
+                    + ", ".join(missing_columns)
+                )
+            else:
+                st.success("El archivo Stock tiene todas las columnas esperadas.")
+
+                # Show column data types and summary
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.metric("Total de registros", len(df_mkc))
+                with col_b:
+                    st.metric("Columnas", len(df_mkc.columns))
+
+                # Display the data
+                display_mkc = df_mkc.copy()
+                for col in display_mkc.columns:
+                    if display_mkc[col].dtype == "object":
+                        display_mkc[col] = display_mkc[col].astype(str)
+                st.dataframe(display_mkc)
+
+        except Exception as e:
+            st.error(f"Error al procesar el archivo: {e}")
+            st.info(
+                "Asegúrate de que el archivo tenga la hoja 'Hoja2' con las columnas:"
+                " Rut Deudor, DV2, Mandante Cuenta, Número de Facturas, "
+                "Suma de Monto Deuda Factura"
+            )
+    else:
+        st.info("Carga un archivo Stock Flujo MKC para continuar.")
+
+    mkc_flujo_file = st.file_uploader(
+        "Selecciona el archivo Flujo MKC",
+        type=["xlsx", "xls"],
+        key="flujo_mkc_flujo",
+    )
+
+    if mkc_flujo_file is not None:
+        st.success("Flujo archivo cargado correctamente.")
+
+        try:
+            df_flujo = pd.read_excel(mkc_flujo_file)
+
+            st.write("Vista previa del archivo Flujo:")
+            st.dataframe(df_flujo.head().astype(str))
+
+            # Check if required columns exist
+            required_columns = [
+                "RUT DEUDOR",
+                "DV",
+                "N°/MANDANTE",
+                "NÚMERO FACTURA",
+                "SALDO DEUDOR",
+            ]
+            missing_columns = [
+                col for col in required_columns if col not in df_flujo.columns
+            ]
+
+            if missing_columns:
+                st.warning(
+                    "Columnas esperadas no encontradas en el flujo: "
+                    + ", ".join(missing_columns)
+                )
+            else:
+                st.success("El archivo Flujo tiene todas las columnas esperadas.")
+
+                # Display the data
+                display_flujo = df_flujo.copy()
+                for col in display_flujo.columns:
+                    if display_flujo[col].dtype == "object":
+                        display_flujo[col] = display_flujo[col].astype(str)
+                st.dataframe(display_flujo)
+
+        except Exception as e:
+            st.error(f"Error al procesar el archivo: {e}")
+            st.info(
+                "Asegúrate de que el archivo tenga las columnas:"
+                " RUT DEUDOR, DV, N°/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
+            )
+    else:
+        st.info("Carga un archivo Flujo MKC para continuar.")

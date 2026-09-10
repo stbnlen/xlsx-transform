@@ -77,7 +77,10 @@ def test_asig_page_tabs():
     with open(asig_path, "r") as f:
         content = f.read()
 
-    assert '["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "Flujo COP", "BCI"]' in content
+    assert (
+        '["Q_BANCO", "Q_CMR", "FORUM", "Flujo FORUM", "Flujo COP", "BCI", "Flujo MKC"]'
+        in content
+    )
 
     assert "with tab1:" in content
     assert "show_q_banco_view()" in content
