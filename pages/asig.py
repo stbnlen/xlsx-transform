@@ -398,7 +398,7 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
         # The "Cuenta de N° de Factura" column will contain the count of records per RUT
         if "Rut Deudor" in df.columns and "Cuenta de N° de Factura" in df.columns:
             agg_dict = {
-                "DV": "first",
+                "DV2": "first",
                 "Mandante": "first",
                 "Cuenta de N° de Factura": "count",
                 "Suma de Monto Deuda Factura": "sum",
