@@ -26,6 +26,11 @@ MESES_ESPANOL = {
 }
 
 
+def _normalize_column_name(name: str) -> str:
+    """Normalize column name: strip, uppercase, remove extra spaces."""
+    return " ".join(name.strip().split())
+
+
 def _find_column_insensitive(df: pd.DataFrame, candidates: list[str]) -> str | None:
     """Find the first column matching candidates case-insensitively."""
     lower_map = {str(col).strip().lower(): col for col in df.columns}
@@ -413,17 +418,22 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
     """Read Flujo MKC flujo data from the 'FLUJO A CARGAR' sheet of the Excel file."""
     try:
         df = pd.read_excel(file, sheet_name=FLUJO_A_CARGAR_SHEET)
+        # Normalize column names to handle extra spaces
+        df.columns = [_normalize_column_name(col) for col in df.columns]
         # Select only the required columns and ensure correct names
+        # Use normalized names for mapping
         column_mapping = {
-            "N°/ MANDANTE": "Cuenta N° de Factura",
+            "N/MANDANTE": "Cuenta N° de Factura",
             "RUT DEUDOR": "RUT DEUDOR",
             "DV": "DV",
             "NÚMERO FACTURA": "NÚMERO FACTURA",
             "SALDO DEUDOR": "SALDO DEUDOR",
         }
-        # Only keep columns that exist in the dataframe
-        existing_columns = [col for col in column_mapping if col in df.columns]
-        df = df[existing_columns].rename(columns=column_mapping)
+        # Normalize mapping keys too
+        normalized_mapping = {_normalize_column_name(k): v for k, v in column_mapping.items()}
+        # Only keep columns that exist in the dataframe (after normalization)
+        existing_columns = [col for col in normalized_mapping if col in df.columns]
+        df = df[existing_columns].rename(columns=normalized_mapping)
         # Extract only the numeric part from Cuenta N° de Factura (e.g., "RECUPERALIA 3" -> "3")
         df["Cuenta N° de Factura"] = df["Cuenta N° de Factura"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
         # Group by RUT to keep only one record per RUT
@@ -884,6 +894,9 @@ with tab7:
             st.dataframe(df_mkc.head().astype(str))
 
             # Check if required columns exist
+            # Normalize column names to handle potential extra spaces
+            df_mkc_normalized = df_mkc.copy()
+            df_mkc_normalized.columns = [_normalize_column_name(col) for col in df_mkc_normalized.columns]
             required_columns = [
                 "Rut Deudor",
                 "DV2",
@@ -891,8 +904,10 @@ with tab7:
                 "Cuenta de N° de Factura",
                 "Suma de Monto Deuda Factura",
             ]
+            # Normalize required columns for comparison
+            normalized_required = [_normalize_column_name(col) for col in required_columns]
             missing_columns = [
-                col for col in required_columns if col not in df_mkc.columns
+                col for col in normalized_required if col not in df_mkc_normalized.columns
             ]
 
             if missing_columns:
@@ -943,6 +958,9 @@ with tab7:
             st.dataframe(df_flujo.head().astype(str))
 
             # Check if required columns exist
+            # Normalize column names to handle potential extra spaces
+            df_flujo_normalized = df_flujo.copy()
+            df_flujo_normalized.columns = [_normalize_column_name(col) for col in df_flujo_normalized.columns]
             required_columns = [
                 "RUT DEUDOR",
                 "DV",
@@ -950,8 +968,10 @@ with tab7:
                 "NÚMERO FACTURA",
                 "SALDO DEUDOR",
             ]
+            # Normalize required columns for comparison
+            normalized_required = [_normalize_column_name(col) for col in required_columns]
             missing_columns = [
-                col for col in required_columns if col not in df_flujo.columns
+                col for col in normalized_required if col not in df_flujo_normalized.columns
             ]
 
             if missing_columns:
@@ -973,7 +993,7 @@ with tab7:
             st.error(f"Error al procesar el archivo: {e}")
             st.info(
                 "Asegúrate de que el archivo tenga las columnas:"
-                "RUT DEUDOR, DV, N°/ MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
+                "RUT DEUDOR, DV, N/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
             )
     else:
         st.info("Carga un archivo Flujo MKC para continuar.")
