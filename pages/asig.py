@@ -403,8 +403,17 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
     """Read Flujo MKC flujo data from the 'FLUJO A CARGAR' sheet of the Excel file."""
     try:
         df = pd.read_excel(file, sheet_name=FLUJO_A_CARGAR_SHEET)
-        # Ensure column names are properly handled
-        # The flujo columns are already in the correct format: RUT DEUDOR, DV, N°/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR
+        # Select only the required columns and ensure correct names
+        column_mapping = {
+            "N°/ MANDANTE": "N°/MANDANTE",
+            "RUT DEUDOR": "RUT DEUDOR",
+            "DV": "DV",
+            "NÚMERO FACTURA": "NÚMERO FACTURA",
+            "SALDO DEUDOR": "SALDO DEUDOR",
+        }
+        # Only keep columns that exist in the dataframe
+        existing_columns = [col for col in column_mapping if col in df.columns]
+        df = df[existing_columns].rename(columns=column_mapping)
         return df
     except ValueError as e:
         raise ValueError(
