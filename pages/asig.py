@@ -388,7 +388,7 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
     try:
         df = pd.read_excel(file, sheet_name="Hoja2")
         # Ensure column names are properly handled - keep original names
-        # Rename columns to match expected format from basemkc.xlsx
+        # Rename columns to match expected format
         column_mapping = {
             "Rut Deudor": "Rut Deudor",
             "DV2": "DV2",
@@ -399,16 +399,6 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
         # Only rename columns that exist
         actual_columns = {col: column_mapping.get(col, col) for col in df.columns}
         df = df.rename(columns=actual_columns)
-        # Group by RUT to keep only one record per RUT
-        # Keep the original values in "Cuenta de N° de Factura" (first value)
-        if "Rut Deudor" in df.columns and "Cuenta de N° de Factura" in df.columns:
-            agg_dict = {
-                "DV2": "first",
-                "Mandante": "first",
-                "Cuenta de N° de Factura": "first",
-                "Suma de Monto Deuda Factura": "sum",
-            }
-            df = df.groupby("Rut Deudor", as_index=False).agg(agg_dict)
         return df
     except ValueError as e:
         raise ValueError("Error leyendo el archivo Flujo MKC stock") from e
