@@ -414,6 +414,8 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         # Only keep columns that exist in the dataframe
         existing_columns = [col for col in column_mapping if col in df.columns]
         df = df[existing_columns].rename(columns=column_mapping)
+        # Extract only the numeric part from N°/MANDANTE (e.g., "RECUPERALIA 3" -> "3")
+        df["N°/MANDANTE"] = df["N°/MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
         return df
     except ValueError as e:
         raise ValueError(
