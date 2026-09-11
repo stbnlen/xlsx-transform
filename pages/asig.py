@@ -383,12 +383,12 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
     try:
         df = pd.read_excel(file, sheet_name="Hoja2")
         # Ensure column names are properly handled - keep original names
-        # Rename columns to match expected format
+        # Rename columns to match expected format from basemkc.xlsx
         column_mapping = {
             "Rut Deudor": "Rut Deudor",
             "DV2": "DV2",
-            "Mandante Cuenta": "Cuenta",
-            "Número de Facturas": "Número de Facturas",
+            "Mandante": "Mandante",
+            "Cuenta de N° de Factura": "Número de Facturas",
             "Suma de Monto Deuda Factura": "Suma de Monto Deuda Factura",
         }
         # Only rename columns that exist
@@ -858,7 +858,7 @@ with tab7:
             required_columns = [
                 "Rut Deudor",
                 "DV2",
-                "Mandante Cuenta",
+                "Mandante",
                 "Número de Facturas",
                 "Suma de Monto Deuda Factura",
             ]
