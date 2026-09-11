@@ -420,10 +420,10 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         df["N°/ MANDANTE"] = df["N°/ MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
         # Group by RUT to keep only one record per RUT
         agg_dict = {
-            "N°/ MANDANTE": "count",
+            "N°/ MANDANTE": "first",
             "DV": "first",
-            "NÚMERO FACTURA": "first",
-            "SALDO DEUDOR": "first",
+            "NÚMERO FACTURA": "count",
+            "SALDO DEUDOR": "sum",
         }
         df = df.groupby("RUT DEUDOR", as_index=False).agg(agg_dict)
         return df
