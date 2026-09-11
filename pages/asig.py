@@ -420,25 +420,17 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         df = pd.read_excel(file, sheet_name=FLUJO_A_CARGAR_SHEET)
         # Normalize column names to handle extra spaces
         df.columns = [_normalize_column_name(col) for col in df.columns]
-        # Select only the required columns and ensure correct names
-        # Use normalized names for mapping
-        column_mapping = {
-            "N/MANDANTE": "Cuenta N° de Factura",
-            "RUT DEUDOR": "RUT DEUDOR",
-            "DV": "DV",
-            "NÚMERO FACTURA": "NÚMERO FACTURA",
-            "SALDO DEUDOR": "SALDO DEUDOR",
-        }
-        # Normalize mapping keys too
-        normalized_mapping = {_normalize_column_name(k): v for k, v in column_mapping.items()}
-        # Only keep columns that exist in the dataframe (after normalization)
-        existing_columns = [col for col in normalized_mapping if col in df.columns]
-        df = df[existing_columns].rename(columns=normalized_mapping)
-        # Extract only the numeric part from Cuenta N° de Factura (e.g., "RECUPERALIA 3" -> "3")
-        df["Cuenta N° de Factura"] = df["Cuenta N° de Factura"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+        # Select only the required columns
+        # The flujo file has these columns: N°/ MANDANTE, RUT DEUDOR, DV, NÚMERO FACTURA, SALDO DEUDOR
+        # Keep original names as specified by the user: NÚMERO FACTURA (not "Cuenta")
+        required = ["N°/ MANDANTE", "RUT DEUDOR", "DV", "NÚMERO FACTURA", "SALDO DEUDOR"]
+        existing = [col for col in required if col in df.columns]
+        df = df[existing].copy()
+        # Extract numeric part from N°/MANDANTE (e.g., "RECUPERALIA 3" -> "3")
+        df["N°/MANDANTE"] = df["N°/MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
         # Group by RUT to keep only one record per RUT
         agg_dict = {
-            "Cuenta N° de Factura": "count",
+            "N°/MANDANTE": "count",
             "DV": "first",
             "NÚMERO FACTURA": "first",
             "SALDO DEUDOR": "first",
