@@ -946,7 +946,7 @@ with tab7:
             required_columns = [
                 "RUT DEUDOR",
                 "DV",
-                "N°/MANDANTE",
+                "N°/ MANDANTE",
                 "NÚMERO FACTURA",
                 "SALDO DEUDOR",
             ]
@@ -973,7 +973,7 @@ with tab7:
             st.error(f"Error al procesar el archivo: {e}")
             st.info(
                 "Asegúrate de que el archivo tenga las columnas:"
-                "RUT DEUDOR, DV, N°/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
+                "RUT DEUDOR, DV, N°/ MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
             )
     else:
         st.info("Carga un archivo Flujo MKC para continuar.")
