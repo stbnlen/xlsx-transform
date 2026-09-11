@@ -416,11 +416,11 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         required = ["N°/ MANDANTE", "RUT DEUDOR", "DV", "NÚMERO FACTURA", "SALDO DEUDOR"]
         existing = [col for col in required if col in df.columns]
         df = df[existing].copy()
-        # Extract numeric part from N°/MANDANTE (e.g., "RECUPERALIA 3" -> "3")
-        df["N°/MANDANTE"] = df["N°/MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+        # Extract numeric part from N°/ MANDANTE (e.g., "RECUPERALIA 3" -> "3")
+        df["N°/ MANDANTE"] = df["N°/ MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
         # Group by RUT to keep only one record per RUT
         agg_dict = {
-            "N°/MANDANTE": "count",
+            "N°/ MANDANTE": "count",
             "DV": "first",
             "NÚMERO FACTURA": "first",
             "SALDO DEUDOR": "first",
