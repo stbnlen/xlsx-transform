@@ -388,12 +388,22 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
             "Rut Deudor": "Rut Deudor",
             "DV2": "DV2",
             "Mandante": "Mandante",
-            "Cuenta de N° de Factura": "Número de Facturas",
+            "Cuenta de N° de Factura": "Cuenta de N° de Factura",
             "Suma de Monto Deuda Factura": "Suma de Monto Deuda Factura",
         }
         # Only rename columns that exist
         actual_columns = {col: column_mapping.get(col, col) for col in df.columns}
         df = df.rename(columns=actual_columns)
+        # Group by RUT to keep only one record per RUT
+        # The "Cuenta de N° de Factura" column will contain the count of records per RUT
+        if "Rut Deudor" in df.columns and "Cuenta de N° de Factura" in df.columns:
+            agg_dict = {
+                "DV": "first",
+                "Mandante": "first",
+                "Cuenta de N° de Factura": "count",
+                "Suma de Monto Deuda Factura": "sum",
+            }
+            df = df.groupby("Rut Deudor", as_index=False).agg(agg_dict)
         return df
     except ValueError as e:
         raise ValueError("Error leyendo el archivo Flujo MKC stock") from e
@@ -870,7 +880,7 @@ with tab7:
                 "Rut Deudor",
                 "DV2",
                 "Mandante",
-                "Número de Facturas",
+                "Cuenta de N° de Factura",
                 "Suma de Monto Deuda Factura",
             ]
             missing_columns = [
