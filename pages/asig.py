@@ -395,12 +395,12 @@ def read_flujo_mkc_stock_file(file: io.BytesIO) -> pd.DataFrame:
         actual_columns = {col: column_mapping.get(col, col) for col in df.columns}
         df = df.rename(columns=actual_columns)
         # Group by RUT to keep only one record per RUT
-        # The "Cuenta de N° de Factura" column will contain the count of records per RUT
+        # Keep the original values in "Cuenta de N° de Factura" (first value)
         if "Rut Deudor" in df.columns and "Cuenta de N° de Factura" in df.columns:
             agg_dict = {
                 "DV2": "first",
                 "Mandante": "first",
-                "Cuenta de N° de Factura": "count",
+                "Cuenta de N° de Factura": "first",
                 "Suma de Monto Deuda Factura": "sum",
             }
             df = df.groupby("Rut Deudor", as_index=False).agg(agg_dict)
@@ -415,7 +415,7 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         df = pd.read_excel(file, sheet_name=FLUJO_A_CARGAR_SHEET)
         # Select only the required columns and ensure correct names
         column_mapping = {
-            "N°/ MANDANTE": "N°/MANDANTE",
+            "N°/ MANDANTE": "Cuenta N° de Factura",
             "RUT DEUDOR": "RUT DEUDOR",
             "DV": "DV",
             "NÚMERO FACTURA": "NÚMERO FACTURA",
@@ -424,8 +424,16 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         # Only keep columns that exist in the dataframe
         existing_columns = [col for col in column_mapping if col in df.columns]
         df = df[existing_columns].rename(columns=column_mapping)
-        # Extract only the numeric part from N°/MANDANTE (e.g., "RECUPERALIA 3" -> "3")
-        df["N°/MANDANTE"] = df["N°/MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+        # Extract only the numeric part from Cuenta N° de Factura (e.g., "RECUPERALIA 3" -> "3")
+        df["Cuenta N° de Factura"] = df["Cuenta N° de Factura"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+        # Group by RUT to keep only one record per RUT
+        agg_dict = {
+            "Cuenta N° de Factura": "count",
+            "DV": "first",
+            "NÚMERO FACTURA": "first",
+            "SALDO DEUDOR": "first",
+        }
+        df = df.groupby("RUT DEUDOR", as_index=False).agg(agg_dict)
         return df
     except ValueError as e:
         raise ValueError(
