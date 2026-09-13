@@ -440,27 +440,28 @@ def process_flujo_mkc_data(
 
     Returns the combined dataframe, the count of accepted RUTs, and the count of discarded RUTs.
     """
-    # Normalize column names
-    df_stock.columns = [_normalize_column_name(col) for col in df_stock.columns]
-    df_flujo.columns = [_normalize_column_name(col) for col in df_flujo.columns]
-
-    # Normalize column names
-    df_stock.columns = [_normalize_column_name(col) for col in df_stock.columns]
-    df_flujo.columns = [_normalize_column_name(col) for col in df_flujo.columns]
+    # Find key columns using case-insensitive search
+    stock_rut_col = _find_column_insensitive(df_stock, ["Rut Deudor", "Rut"])
+    flujo_rut_col = _find_column_insensitive(df_flujo, ["Rut Deudor", "RUT DEUDOR", "Rut"])
+    flujo_nombre_col = _find_column_insensitive(df_flujo, ["N°/ MANDANTE", "N°/MANDANTE"])
 
     # Get stock RUTs
     stock_ruts: set[str] = set()
-    rut_col = _find_column_insensitive(df_stock, ["Rut Deudor", "Rut"])
-    if rut_col:
-        stock_ruts = set(_normalize_rut_series(df_stock[rut_col]))
+    if stock_rut_col:
+        stock_ruts = set(_normalize_rut_series(df_stock[stock_rut_col]))
         stock_ruts.discard("")
         stock_ruts.discard("nan")
 
-    # Process flujo - extract numeric part from N°/ MANDANTE and keep only number
-    df_flujo["N°/ MANDANTE"] = df_flujo["N°/ MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+    # Process flujo - extract numeric part from N°/MANDANTE and keep only number
+    if flujo_nombre_col:
+        df_flujo["N°/MANDANTE"] = df_flujo[flujo_nombre_col].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
 
-    # Check which RUTs are new - use normalized column name
-    mask_new = ~df_flujo["RUT DEUDOR"].isin(stock_ruts)
+    # Check which RUTs are new
+    if flujo_rut_col:
+        mask_new = ~df_flujo[flujo_rut_col].isin(stock_ruts)
+    else:
+        mask_new = pd.Series([True] * len(df_flujo))
+
     discarded_count = int((~mask_new).sum())
     accepted_count = int(mask_new.sum())
 
@@ -469,24 +470,27 @@ def process_flujo_mkc_data(
         [df_stock.copy(), df_flujo[mask_new]], ignore_index=True
     )
 
-    # Ensure all required columns exist
-    required_columns = [
-        "Rut Deudor",
-        "DV2",
-        "Mandante",
-        "Cuenta de N° de Factura",
-        "Suma de Monto Deuda Factura",
-    ]
-    for col in required_columns:
+    # Ensure all required columns exist with proper names
+    # Rename columns in combined_df to match the expected format
+    combined_df.columns = [_normalize_column_name(col) for col in combined_df.columns]
+
+    # Fill missing columns with defaults
+    required_columns = {
+        "Rut Deudor": "",
+        "DV2": "",
+        "Mandante": "",
+        "Cuenta de N° de Factura": "",
+        "Suma de Monto Deuda Factura": "",
+    }
+    for col, default in required_columns.items():
         if col not in combined_df.columns:
-            combined_df[col] = ""
+            combined_df[col] = default
 
-    # Fill NaN with empty string in certain columns
-    for col in ["Mandante", "Cuenta de N° de Factura"]:
-        if col in combined_df.columns:
-            combined_df[col] = combined_df[col].fillna("")
+    # Keep only the required columns in the correct order
+    final_columns = list(required_columns.keys())
+    combined_df = combined_df[[col for col in final_columns if col in combined_df.columns]]
 
-    return combined_df[required_columns], accepted_count, discarded_count
+    return combined_df, accepted_count, discarded_count
 
 
 def _clean_str_series(series: pd.Series) -> pd.Series:
