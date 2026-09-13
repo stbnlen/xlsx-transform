@@ -433,6 +433,58 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         ) from e
 
 
+def process_flujo_mkc_data(
+    df_stock: pd.DataFrame, df_flujo: pd.DataFrame
+) -> tuple[pd.DataFrame, int, int]:
+    """Append flujo mkc records to stock, skipping RUTs already present in stock.
+
+    Returns the combined dataframe, the count of accepted RUTs, and the count of discarded RUTs.
+    """
+    # Normalize column names
+    df_stock.columns = [_normalize_column_name(col) for col in df_stock.columns]
+    df_flujo.columns = [_normalize_column_name(col) for col in df_flujo.columns]
+
+    # Get stock RUTs
+    stock_ruts: set[str] = set()
+    rut_col = _find_column_insensitive(df_stock, ["Rut Deudor", "Rut"])
+    if rut_col:
+        stock_ruts = set(_normalize_rut_series(df_stock[rut_col]))
+        stock_ruts.discard("")
+        stock_ruts.discard("nan")
+
+    # Process flujo - extract numeric part from N°/MANDANTE and keep only number
+    df_flujo["N°/MANDANTE"] = df_flujo["N°/MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+
+    # Check which RUTs are new
+    mask_new = ~df_flujo["Rut Deudor"].isin(stock_ruts)
+    discarded_count = int((~mask_new).sum())
+    accepted_count = int(mask_new.sum())
+
+    # Combine stock and new flujo records
+    combined_df = pd.concat(
+        [df_stock.copy(), df_flujo[mask_new]], ignore_index=True
+    )
+
+    # Ensure all required columns exist
+    required_columns = [
+        "Rut Deudor",
+        "DV2",
+        "Mandante",
+        "Cuenta de N° de Factura",
+        "Suma de Monto Deuda Factura",
+    ]
+    for col in required_columns:
+        if col not in combined_df.columns:
+            combined_df[col] = ""
+
+    # Fill NaN with empty string in certain columns
+    for col in ["Mandante", "Cuenta de N° de Factura"]:
+        if col in combined_df.columns:
+            combined_df[col] = combined_df[col].fillna("")
+
+    return combined_df[required_columns], accepted_count, discarded_count
+
+
 def _clean_str_series(series: pd.Series) -> pd.Series:
     """Convert a series to clean strings: trimmed, uppercased, NaN as ''."""
     return series.astype(str).str.strip().str.upper().replace("NAN", "")
@@ -971,11 +1023,60 @@ with tab7:
                         display_flujo[col] = display_flujo[col].astype(str)
                 st.dataframe(display_flujo)
 
+                # If stock file was also uploaded, combine them
+                if mkc_stock_file is not None:
+                    st.info("Ambos archivos cargados. Procesando combinación...")
+                    
+                    # Combine stock and flujo, checking for duplicate RUTs
+                    required_stock_cols = [
+                        "Rut Deudor",
+                        "DV2",
+                        "Mandante",
+                        "Cuenta de N° de Factura",
+                        "Suma de Monto Deuda Factura",
+                    ]
+                    df_combined, accepted_count, discarded_count = process_flujo_mkc_data(
+                        df_mkc, df_flujo
+                    )
+                    
+                    col_a, col_b, col_c, col_d = st.columns(4)
+                    col_a.metric("Registros en el flujo", len(df_flujo))
+                    col_b.metric("RUTs únicos agrupados", accepted_count + discarded_count)
+                    col_c.metric("Aceptados (RUT nuevo)", accepted_count)
+                    col_d.metric("Descartados (RUT en stock)", discarded_count)
+                    
+                    st.write(
+                        f"Stock final: {len(df_combined)} registros "
+                        f"(stock original: {len(df_mkc)})."
+                    )
+                    
+                    display_combined = df_combined.copy()
+                    for col in display_combined.columns:
+                        if display_combined[col].dtype == "object":
+                            display_combined[col] = display_combined[col].astype(str)
+                    st.dataframe(display_combined)
+                    
+                    # Download button
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                        df_combined.to_excel(writer, index=False)
+                    excel_data = output.getvalue()
+                    
+                    ahora = datetime.now()
+                    dia_actual = ahora.day
+                    mes_actual = MESES_ESPANOL[ahora.month]
+                    anio_actual = ahora.year
+                    nombre_archivo = f"MKC_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
+                    
+                    st.download_button(
+                        label="Descargar stock actualizado como XLSX",
+                        data=excel_data,
+                        file_name=nombre_archivo,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
             st.info(
                 "Asegúrate de que el archivo tenga las columnas:"
                 "RUT DEUDOR, DV, N/MANDANTE, NÚMERO FACTURA, SALDO DEUDOR"
             )
-    else:
-        st.info("Carga un archivo Flujo MKC para continuar.")
