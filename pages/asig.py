@@ -413,11 +413,19 @@ def read_flujo_mkc_flujo_file(file: io.BytesIO) -> pd.DataFrame:
         # Select only the required columns
         # The flujo file has these columns: N°/ MANDANTE, RUT DEUDOR, DV, NÚMERO FACTURA, SALDO DEUDOR
         # Keep original names as specified by the user: NÚMERO FACTURA (not "Cuenta")
-        required = ["N°/ MANDANTE", "RUT DEUDOR", "DV", "NÚMERO FACTURA", "SALDO DEUDOR"]
+        required = [
+            "N°/ MANDANTE",
+            "RUT DEUDOR",
+            "DV",
+            "NÚMERO FACTURA",
+            "SALDO DEUDOR",
+        ]
         existing = [col for col in required if col in df.columns]
         df = df[existing].copy()
         # Extract numeric part from N°/ MANDANTE (e.g., "RECUPERALIA 3" -> "3")
-        df["N°/ MANDANTE"] = df["N°/ MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+        df["N°/ MANDANTE"] = (
+            df["N°/ MANDANTE"].astype(str).str.extract(r"(\d+)").fillna("").astype(str)
+        )
         # Group by RUT to keep only one record per RUT
         agg_dict = {
             "N°/ MANDANTE": "first",
@@ -442,8 +450,12 @@ def process_flujo_mkc_data(
     """
     # Find key columns using case-insensitive search
     stock_rut_col = _find_column_insensitive(df_stock, ["Rut Deudor", "Rut"])
-    flujo_rut_col = _find_column_insensitive(df_flujo, ["Rut Deudor", "RUT DEUDOR", "Rut"])
-    flujo_nombre_col = _find_column_insensitive(df_flujo, ["N°/ MANDANTE", "N°/MANDANTE"])
+    flujo_rut_col = _find_column_insensitive(
+        df_flujo, ["Rut Deudor", "RUT DEUDOR", "Rut"]
+    )
+    flujo_nombre_col = _find_column_insensitive(
+        df_flujo, ["N°/ MANDANTE", "N°/MANDANTE"]
+    )
 
     # Get stock RUTs
     stock_ruts: set[str] = set()
@@ -454,21 +466,40 @@ def process_flujo_mkc_data(
 
     # Process flujo - extract numeric part from N°/MANDANTE and keep only number
     if flujo_nombre_col:
-        df_flujo["N°/MANDANTE"] = df_flujo[flujo_nombre_col].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+        df_flujo["N°/MANDANTE"] = (
+            df_flujo[flujo_nombre_col]
+            .astype(str)
+            .str.extract(r"(\d+)")
+            .fillna("")
+            .astype(str)
+        )
 
     # Check which RUTs are new
     if flujo_rut_col:
-        mask_new = ~df_flujo[flujo_rut_col].isin(stock_ruts)
+        # Normalize flujo RUTs before comparison (strip DV, keep only digits)
+        flujo_ruts_normalized = _normalize_rut_series(df_flujo[flujo_rut_col])
+        mask_new = ~flujo_ruts_normalized.isin(stock_ruts)
     else:
         mask_new = pd.Series([True] * len(df_flujo))
 
     discarded_count = int((~mask_new).sum())
     accepted_count = int(mask_new.sum())
 
+    # Map flujo columns to stock column names before concatenation
+    columna_map = {
+        "RUT DEUDOR": "Rut Deudor",
+        "DV": "DV2",
+        "N°/ MANDANTE": "Mandante",
+        "NÚMERO FACTURA": "Cuenta de N° de Factura",
+        "SALDO DEUDOR": "Suma de Monto Deuda Factura",
+    }
+    df_flujo_mapped = df_flujo[mask_new].copy()
+    df_flujo_mapped.columns = [
+        columna_map.get(col, col) for col in df_flujo_mapped.columns
+    ]
+
     # Combine stock and new flujo records
-    combined_df = pd.concat(
-        [df_stock.copy(), df_flujo[mask_new]], ignore_index=True
-    )
+    combined_df = pd.concat([df_stock.copy(), df_flujo_mapped], ignore_index=True)
 
     # Ensure all required columns exist with proper names
     # Rename columns in combined_df to match the expected format
@@ -488,7 +519,9 @@ def process_flujo_mkc_data(
 
     # Keep only the required columns in the correct order
     final_columns = list(required_columns.keys())
-    combined_df = combined_df[[col for col in final_columns if col in combined_df.columns]]
+    combined_df = combined_df[
+        [col for col in final_columns if col in combined_df.columns]
+    ]
 
     return combined_df, accepted_count, discarded_count
 
@@ -938,7 +971,9 @@ with tab7:
             # Check if required columns exist
             # Normalize column names to handle potential extra spaces
             df_mkc_normalized = df_mkc.copy()
-            df_mkc_normalized.columns = [_normalize_column_name(col) for col in df_mkc_normalized.columns]
+            df_mkc_normalized.columns = [
+                _normalize_column_name(col) for col in df_mkc_normalized.columns
+            ]
             required_columns = [
                 "Rut Deudor",
                 "DV2",
@@ -947,9 +982,13 @@ with tab7:
                 "Suma de Monto Deuda Factura",
             ]
             # Normalize required columns for comparison
-            normalized_required = [_normalize_column_name(col) for col in required_columns]
+            normalized_required = [
+                _normalize_column_name(col) for col in required_columns
+            ]
             missing_columns = [
-                col for col in normalized_required if col not in df_mkc_normalized.columns
+                col
+                for col in normalized_required
+                if col not in df_mkc_normalized.columns
             ]
 
             if missing_columns:
@@ -1002,7 +1041,9 @@ with tab7:
             # Check if required columns exist
             # Normalize column names to handle potential extra spaces
             df_flujo_normalized = df_flujo.copy()
-            df_flujo_normalized.columns = [_normalize_column_name(col) for col in df_flujo_normalized.columns]
+            df_flujo_normalized.columns = [
+                _normalize_column_name(col) for col in df_flujo_normalized.columns
+            ]
             required_columns = [
                 "RUT DEUDOR",
                 "DV",
@@ -1011,9 +1052,13 @@ with tab7:
                 "SALDO DEUDOR",
             ]
             # Normalize required columns for comparison
-            normalized_required = [_normalize_column_name(col) for col in required_columns]
+            normalized_required = [
+                _normalize_column_name(col) for col in required_columns
+            ]
             missing_columns = [
-                col for col in normalized_required if col not in df_flujo_normalized.columns
+                col
+                for col in normalized_required
+                if col not in df_flujo_normalized.columns
             ]
 
             if missing_columns:
@@ -1034,7 +1079,7 @@ with tab7:
                 # If stock file was also uploaded, combine them
                 if mkc_stock_file is not None:
                     st.info("Ambos archivos cargados. Procesando combinación...")
-                    
+
                     # Combine stock and flujo, checking for duplicate RUTs
                     required_stock_cols = [
                         "Rut Deudor",
@@ -1043,39 +1088,41 @@ with tab7:
                         "Cuenta de N° de Factura",
                         "Suma de Monto Deuda Factura",
                     ]
-                    df_combined, accepted_count, discarded_count = process_flujo_mkc_data(
-                        df_mkc, df_flujo
+                    df_combined, accepted_count, discarded_count = (
+                        process_flujo_mkc_data(df_mkc, df_flujo)
                     )
-                    
+
                     col_a, col_b, col_c, col_d = st.columns(4)
                     col_a.metric("Registros en el flujo", len(df_flujo))
-                    col_b.metric("RUTs únicos agrupados", accepted_count + discarded_count)
+                    col_b.metric(
+                        "RUTs únicos agrupados", accepted_count + discarded_count
+                    )
                     col_c.metric("Aceptados (RUT nuevo)", accepted_count)
                     col_d.metric("Descartados (RUT en stock)", discarded_count)
-                    
+
                     st.write(
                         f"Stock final: {len(df_combined)} registros "
                         f"(stock original: {len(df_mkc)})."
                     )
-                    
+
                     display_combined = df_combined.copy()
                     for col in display_combined.columns:
                         if display_combined[col].dtype == "object":
                             display_combined[col] = display_combined[col].astype(str)
                     st.dataframe(display_combined)
-                    
+
                     # Download button
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine="openpyxl") as writer:
                         df_combined.to_excel(writer, index=False)
                     excel_data = output.getvalue()
-                    
+
                     ahora = datetime.now()
                     dia_actual = ahora.day
                     mes_actual = MESES_ESPANOL[ahora.month]
                     anio_actual = ahora.year
                     nombre_archivo = f"MKC_{dia_actual}_{mes_actual}_{anio_actual}.xlsx"
-                    
+
                     st.download_button(
                         label="Descargar stock actualizado como XLSX",
                         data=excel_data,
