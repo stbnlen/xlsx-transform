@@ -444,6 +444,10 @@ def process_flujo_mkc_data(
     df_stock.columns = [_normalize_column_name(col) for col in df_stock.columns]
     df_flujo.columns = [_normalize_column_name(col) for col in df_flujo.columns]
 
+    # Normalize column names
+    df_stock.columns = [_normalize_column_name(col) for col in df_stock.columns]
+    df_flujo.columns = [_normalize_column_name(col) for col in df_flujo.columns]
+
     # Get stock RUTs
     stock_ruts: set[str] = set()
     rut_col = _find_column_insensitive(df_stock, ["Rut Deudor", "Rut"])
@@ -455,8 +459,8 @@ def process_flujo_mkc_data(
     # Process flujo - extract numeric part from N°/ MANDANTE and keep only number
     df_flujo["N°/ MANDANTE"] = df_flujo["N°/ MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
 
-    # Check which RUTs are new
-    mask_new = ~df_flujo["Rut Deudor"].isin(stock_ruts)
+    # Check which RUTs are new - use normalized column name
+    mask_new = ~df_flujo["RUT DEUDOR"].isin(stock_ruts)
     discarded_count = int((~mask_new).sum())
     accepted_count = int(mask_new.sum())
 
