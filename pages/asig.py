@@ -452,8 +452,8 @@ def process_flujo_mkc_data(
         stock_ruts.discard("")
         stock_ruts.discard("nan")
 
-    # Process flujo - extract numeric part from N°/MANDANTE and keep only number
-    df_flujo["N°/MANDANTE"] = df_flujo["N°/MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
+    # Process flujo - extract numeric part from N°/ MANDANTE and keep only number
+    df_flujo["N°/ MANDANTE"] = df_flujo["N°/ MANDANTE"].astype(str).str.extract(r'(\d+)').fillna("").astype(str)
 
     # Check which RUTs are new
     mask_new = ~df_flujo["Rut Deudor"].isin(stock_ruts)
